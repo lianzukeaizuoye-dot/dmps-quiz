@@ -300,7 +300,9 @@ const store = {
 
 /* ===== 状態 ===== */
 let settings = loadJSON('dmpq-settings', {th2:0.6, th3:0.3, margin:0.1, article:true});
-let stats = loadJSON('dmpq-stats', {total:0, correct:0, cards:{}});
+// カード別の成績は、id が __proto__ などでも壊れないようにプロトタイプのないオブジェクトに入れる（保存形式は変わらない）
+const statCards = o => Object.assign(Object.create(null), o && typeof o === 'object' && !Array.isArray(o) ? o : {});
+let stats = loadJSON('dmpq-stats', {total:0, correct:0, cards:{}}); stats.cards = statCards(stats.cards);
 let quizCfg = loadJSON('dmpq-quiz', {formats:['ft','spec'], customFields:['civ','cost','power'], civs:[], set:'', count:10, mode:'free'});
 let cards = [], byId = new Map(), dataSource = 'sample';
 let UNIQ = {}, customCache = null, NAME_SET = new Set();
@@ -465,6 +467,7 @@ const uniqVals = f => [...new Set(cards.flatMap(f))].filter(Boolean);
 /* ===== CSV 読み込み ===== */
 const HEADER_MAP = {id:'id',name:'name','カード名':'name','名前':'name',reading:'reading','読み方':'reading','読み':'reading',type:'type','カードタイプ':'type','タイプ':'type',civ:'civ','文明':'civ',cost:'cost','コスト':'cost',power:'power','パワー':'power',text:'text','カードテキスト':'text','テキスト':'text',rarity:'rarity','レアリティ':'rarity',set:'set','収録弾':'set',flavor:'flavor','フレーバーテキスト':'flavor','フレーバー':'flavor',ft:'flavor',twin_id:'twin_id',aliases:'aliases','別名':'aliases'};
 function toInt(v){ const s = String(v ?? '').normalize('NFKC').replace(/[,\s]/g, ''); if(s === '') return null; if(!/^-?\d+$/.test(s)) return NaN; return parseInt(s, 10); }
+const RESERVED_IDS = ['__proto__', 'constructor', 'prototype'];
 function importRows(rows){
   const out = [], errs = [], ids = new Set();
   rows.forEach((raw, i) => {
@@ -477,6 +480,7 @@ function importRows(rows){
     const power = toInt(r.power); if(Number.isNaN(power)) problems.push('パワーが数値ではない');
     let id = String(r.id ?? '').trim(); if(!id) id = 'row' + line;
     if(ids.has(id)) problems.push(`id「${id}」が重複`);
+    if(RESERVED_IDS.includes(id)) problems.push(`id「${id}」は使えない`);
     if(problems.length){ errs.push({line, name:String(r.name ?? ''), problems}); return; }
     ids.add(id); out.push({...r, id, cost, power});
   });
@@ -499,6 +503,7 @@ async function handleFile(file){
   if(out.length){
     cards = out.map(prepCard); dataSource = 'csv'; searchRange = null; session = null; quizView = 'setup';
     rebuild(); await store.set('cards', out); await store.set('source', 'csv');
+    if(host && host.share){ host.share = false; hostSync(); }  // 読み込み直したデータを渡すかは、もう一度明示的に許可してもらう
   }
   render();
 }
@@ -772,6 +777,7 @@ function dataHTML(){
     <div class="row"><label class="btn primary" style="cursor:pointer">CSVを読み込む<input type="file" id="csvfile" accept=".csv,.tsv,.txt,text/csv" class="visually-hidden"></label>${dataSource === 'csv' ? '<button class="btn" data-act="reset-data">読み込んだCSVを消す</button>' : ''}</div>
     ${rep ? (rep.fatal ? `<p class="ng" style="margin-top:12px">${esc(rep.fatal)}</p>` : `
       <p style="margin-top:12px">「${esc(rep.file)}」から<span class="ok">${rep.ok}枚</span>を取り込みました。${rep.errs.length ? `<span class="ng">${rep.errs.length}行</span>は取り込めませんでした。` : ''}${rep.ok ? '' : 'いまのデータはそのままです。'}</p>
+      ${rep.note ? `<p class="note">${esc(rep.note)}</p>` : ''}
       ${rep.errs.length ? `<ul class="errlist">${rep.errs.slice(0, 100).map(e => `<li>${e.line}行目 ${esc(e.name)}：${esc(e.problems.join('、'))}</li>`).join('')}</ul>` : ''}`) : ''}
   </section>
   <section class="block panel">
@@ -840,7 +846,7 @@ function createRoom(){
   if(typeof Peer === 'undefined'){ partyError = '通信用の部品を読み込めませんでした。ネットワークを確認して、ページを開き直してください。'; render(); return; }
   const code = genCode();
   const peer = new Peer(PEER_PREFIX + code, {debug:0});
-  host = {peer, code, players:new Map(), phase:'opening', cfg:{...partyCfg}, idx:0, total:partyCfg.count, used:new Set(), q:null, pub:null, answers:new Map(), results:null, startedAt:0, endsAt:0};
+  host = {peer, code, players:new Map(), phase:'opening', cfg:{...partyCfg}, idx:0, total:partyCfg.count, used:new Set(), q:null, pub:null, answers:new Map(), results:null, startedAt:0, endsAt:0, share:false, sending:0, dataCount:0, dataStarts:new Map(), dataActive:new Set(), dataDone:new Set(), dataBytes:0};
   const me = host;
   peer.on('open', () => { if(host !== me) return; host.phase = 'lobby'; render(); });
   peer.on('error', err => {
@@ -885,8 +891,82 @@ function hostOnData(conn, m){
     const online = [...host.players.values()].filter(x => x.online);
     if(online.length && online.every(x => host.answers.has(x.pid))) closeQuestion();
     else hostSyncSoon();
-  }
+  } else if(m.t === 'data-req') hostSendData(conn);
 }
+/* カードデータの受け渡し：主催者が許可したときだけ、ロビー中に join 済みの参加者へ、チャンクに分けて送る
+   最後のチャンクまで送った参加者（pid）には、その部屋の間はもう送らない。送り始める回数は、pid ごとと部屋全体の両方に上限がある（中止した分も数える） */
+const DATA_COLS = ['id','name','reading','type','civ','cost','power','text','rarity','set','flavor','twin_id','aliases'];
+const DATA_CHUNK = 16000, DATA_MAX_CHUNK = 16384, DATA_MAX_N = 1000, DATA_MAX_TOTAL = 8000000, DATA_MAX_ROWS = 20000, DATA_MAX_FIELD = 10000;
+const DATA_MAX_SENDS = 3, DATA_ROOM_SENDS = 60, DATA_PID_STARTS = 3, DATA_BUF_MAX = 256 * 1024, DATA_STALL = 20000, DATA_SEND_MS = 120000;
+const DATA_TIMEOUT = 30000, DATA_RECV_MS = 300000;  // 参加者側：チャンクの間隔と、受信全体の締め切り
+let dataCache = null;
+// cards を CSV 取り込みと同じ形の行（値はすべて文字列、複数値は「/」区切り）に戻して JSON にする。cards が替わるまで使い回す
+// サロゲートペアは \uXXXX に書き換える（チャンクの境界で割れても、UTF-8 で送るときに壊れないように）
+function dataJSON(){
+  if(!dataCache || dataCache.src !== cards){
+    const rows = cards.map(c => ({id:c.id, name:c.name, reading:c.reading, type:c.type, civ:c.civ.join('/'), cost:String(c.cost), power:c.power == null ? '' : String(c.power),
+      text:c.text, rarity:c.rarity, set:c.set.join('/'), flavor:c.flavor, twin_id:c.twin_id, aliases:c.aliases.join('/')}));
+    dataCache = {src:cards, json:JSON.stringify(rows).replace(/[\uD800-\uDFFF]/g, ch => '\\u' + ch.charCodeAt(0).toString(16))};
+  }
+  return dataCache.json;
+}
+const dataAbort = (conn, reason) => { try{ conn.send({t:'data-abort', reason}); }catch(e){} };
+const utf8Len = s => new TextEncoder().encode(s).length;
+function hostSendData(conn){
+  const p = host.players.get(conn._pid);
+  // 許可されていない要求（渡す設定がオフ・ロビー以外・古い接続）には、接続ごとに1回だけ off を返す。join していない接続には返さない
+  if(!host.share || dataSource !== 'csv' || host.phase !== 'lobby' || !p || p.conn !== conn){ if(p && !conn._offSent){ conn._offSent = true; dataAbort(conn, 'off'); } return; }
+  const pid = p.pid;
+  // この接続へ送信中、または同じ pid が別の接続で受け取り中なら、混雑として返す（2本で同時に受け取らないように。送信中の受信は止めない）
+  const busy = () => { try{ conn.send({t:'data-busy'}); }catch(e){} };
+  if(conn._dataBusy || host.dataActive.has(pid)){ busy(); return; }
+  // 回数の上限：受け取り済みの pid、pid ごとの開始回数、部屋全体の開始回数。同じ接続への通知は1回だけ
+  if(host.dataDone.has(pid) || (host.dataStarts.get(pid) || 0) >= DATA_PID_STARTS || host.dataCount >= DATA_ROOM_SENDS){ if(!conn._limitSent){ conn._limitSent = true; dataAbort(conn, 'limit'); } return; }
+  if(host.sending >= DATA_MAX_SENDS){ busy(); return; }
+  const json = dataJSON();
+  if(json.length > DATA_MAX_TOTAL){ dataAbort(conn, 'too-big'); return; }  // 参加者側で必ず拒否される大きさは送らない（800万文字以下なら DATA_MAX_N 以内に収まる）
+  const n = Math.ceil(json.length / DATA_CHUNK);
+  const me = host, id = Math.random().toString(36).slice(2, 10), started = Date.now();
+  let i = 0, done = false, moved = started, lastBuf = 0;
+  me.sending++; me.dataCount++; me.dataStarts.set(pid, (me.dataStarts.get(pid) || 0) + 1); me.dataActive.add(pid); conn._dataBusy = true;
+  hostDataShow();
+  // reason があれば data-abort を送る。最後のチャンクまで送ったときだけ受け取り済みとして数える（相手の保存の成否は確かめない）
+  const end = (reason, complete) => {
+    if(done) return; done = true; me.sending--; me.dataActive.delete(pid); conn._dataBusy = false;
+    if(complete) me.dataDone.add(pid);
+    if(reason && conn.open) dataAbort(conn, reason);
+    if(host === me) hostDataShow();
+  };
+  // 送信バッファ（RTCDataChannel と PeerJS 内部の分）がたまっている間は待つ。減らないまま20秒、または開始から120秒で打ち切る
+  const step = () => {
+    if(host !== me || !conn.open) return end('');
+    if(me.phase !== 'lobby') return end('start');
+    if(dataSource !== 'csv') return end('reset');
+    if(!me.share) return end('off');
+    const now = Date.now();
+    if(now - started > DATA_SEND_MS) return end('timeout');
+    const buf = conn.dataChannel && conn.dataChannel.bufferedAmount || 0, bs = conn.bufferSize || 0;
+    if(buf > DATA_BUF_MAX || bs > 0){
+      if(buf + bs < lastBuf) moved = now;
+      lastBuf = buf + bs;
+      if(now - moved > DATA_STALL) return end('timeout');
+      setTimeout(step, 50); return;
+    }
+    const s = json.slice(i * DATA_CHUNK, (i + 1) * DATA_CHUNK);
+    try{ conn.send({t:'data-chunk', id, i, n, s}); }catch(e){ return end(''); }
+    me.dataBytes += utf8Len(s); hostDataShow();
+    moved = now; lastBuf = 0;
+    if(++i >= n) return end('', true);
+    setTimeout(step, 10);
+  };
+  step();
+}
+// 主催者のロビーに出す送信の状況（チャンクごとに書き換えるので、全体は描き直さない）
+function dataStatusText(){
+  const h = host;
+  return `受け取り済み ${h.dataDone.size}人／送信中 ${h.sending}／部屋の残り回数 ${Math.max(0, DATA_ROOM_SENDS - h.dataCount)}　送った量 ${(h.dataBytes / 1048576).toFixed(1)}MB`;
+}
+function hostDataShow(){ const el = $('#h-data'); if(el && host) el.textContent = dataStatusText(); }
 function hostOnClose(conn){
   const p = host.players.get(conn._pid);
   if(p && p.conn === conn){ p.online = false; hostSyncSoon(); }
@@ -898,6 +978,7 @@ function stateFor(p, rk){
     remain:host.phase === 'question' ? Math.max(0, host.endsAt - Date.now()) : 0,
     q:(host.phase === 'question' || host.phase === 'reveal') ? host.pub : null,
     answered:host.answers.size, online:[...host.players.values()].filter(x => x.online).length,
+    share:!!(host.share && dataSource === 'csv' && host.phase === 'lobby'),
     board:rk.map(r => ({name:r.name, score:r.score, rank:r.rank, online:r.online, me:r.pid === p.pid})),
     me:{name:p.name, score:p.score, rank:(rk.find(r => r.pid === p.pid) || {}).rank || '-', answered:host.answers.has(p.pid), answerText:(host.answers.get(p.pid) || {}).text || ''}
   };
@@ -980,6 +1061,12 @@ function hostHTML(){
     <h3>参加者 ${online.length}人</h3>
     <div class="plist">${players.length ? players.map(p => `<span class="pchip ${p.online ? '' : 'off'}">${esc(p.name)}</span>`).join('') : '<span class="note">まだ誰も参加していません</span>'}</div>
     <details class="panel" style="margin-bottom:16px"><summary style="cursor:pointer;font-weight:700">大会の設定（${h.cfg.count}問・1問${h.cfg.time}秒・${h.cfg.mode === 'choice' ? '4択' : '自由入力'}）</summary><div style="margin-top:12px">${partyCfgHTML(h.cfg)}</div></details>
+    <div class="panel" style="margin-bottom:16px">
+      <label class="check" style="border-top:0;padding-top:0"><input type="checkbox" data-pshare ${h.share && dataSource === 'csv' ? 'checked' : ''} ${dataSource === 'csv' ? '' : 'disabled'}>参加者にカードデータを渡す</label>
+      <p class="note" style="margin:0">${dataSource === 'csv' ? 'オンにすると、ロビーにいる参加者が「カードデータを受け取る」を押したときに、この端末のカードデータを端末間の通信で直接送ります。受け取ったデータは参加者のブラウザに保存されます。' : 'いまはサンプルデータなので渡せません。データタブでCSVを読み込むと選べます。'}</p>
+      <p class="note" id="h-data" style="margin:8px 0 0">${esc(dataStatusText())}</p>
+      <p class="note" style="margin:0">送り始める回数は、1人${DATA_PID_STARTS}回・部屋全体で${DATA_ROOM_SENDS}回までです（中止した分も数えます）。<button class="btn ghost" data-act="host-data-reset" style="min-height:32px">回数をリセット</button></p>
+    </div>
     <button class="btn primary big" data-act="host-start" ${online.length ? '' : 'disabled'}>${online.length ? `${online.length}人で開始する` : '参加者を待っています'}</button>`;
   if(h.phase === 'question') return `${head}
     <div class="qbar"><span><b>第${h.idx}問 / ${h.total}</b>　${FMT_LABEL[h.q.fmt]}</span><span>回答 <b>${h.answers.size}</b> / ${online.length}</span></div>
@@ -1013,7 +1100,8 @@ function joinRoom(code, name){
   partyError = '';
   try{ localStorage.setItem('dmpq-name', name); }catch(e){}
   if(player && player.peer){ try{ player.peer.destroy(); }catch(e){} }
-  player = {code, name, pid:getPid(), status:'connecting', state:null, err:'', lastKey:'', deadline:0};
+  if(player && player.dl) dlStop(player.dl);
+  player = {code, name, pid:getPid(), status:'connecting', state:null, err:'', lastKey:'', deadline:0, dl:null};
   const me = player;
   render();
   if(typeof Peer === 'undefined'){ player.status = 'error'; player.err = '通信用の部品を読み込めませんでした。ネットワークを確認して、ページを開き直してください。'; render(); return; }
@@ -1051,7 +1139,7 @@ function cleanState(m){
   const time = Math.min(Math.max(0, fin(m.time)), 600);
   return {
     t:'state', phase:m.phase, idx:fin(m.idx), total:fin(m.total), mode:m.mode === 'choice' ? 'choice' : 'free', time,
-    remain:Math.min(Math.max(0, fin(m.remain)), time * 1000), q:cleanQ(m.q), answered:fin(m.answered), online:fin(m.online),
+    remain:Math.min(Math.max(0, fin(m.remain)), time * 1000), q:cleanQ(m.q), answered:fin(m.answered), online:fin(m.online), share:m.share === true,
     board:Array.isArray(m.board) ? m.board.slice(0, 30).filter(isObj).map(x => ({name:str(x.name, 16), score:fin(x.score), rank:rankOf(x.rank), online:x.online === true, me:x.me === true})) : [],
     me:{name:str(me.name, 16), score:fin(me.score), rank:rankOf(me.rank), answered:me.answered === true, answerText:str(me.answerText, MAX_ANSWER)},
     reveal:r ? {answer:str(r.answer, 200), sub:str(r.sub, 200), mine:mine ? {g:str(mine.g, 4), pts:fin(mine.pts), input:str(mine.input, MAX_ANSWER), msg:str(mine.msg, 200)} : null} : null
@@ -1061,16 +1149,99 @@ function playerOnData(m){
   if(!m || typeof m !== 'object') return;
   if(m.t === 'closed'){ player.status = 'ended'; render(); return; }
   if(m.t === 'error'){ player.status = 'error'; player.err = str(m.msg, 200) || 'エラーが起きました'; render(); return; }
+  if(m.t === 'data-chunk' || m.t === 'data-busy' || m.t === 'data-abort'){ playerOnDataMsg(m); return; }
   if(m.t !== 'state') return;
   m = cleanState(m); if(!m) return;
   player.state = m;
   if(m.phase === 'question') player.deadline = Date.now() + Number(m.remain || 0);
-  const key = `${player.status}|${m.phase}|${m.idx}|${m.me && m.me.answered}`;
+  const key = `${player.status}|${m.phase}|${m.idx}|${m.me && m.me.answered}|${m.share}`;
   if(tab !== 'party') return;
   if(key === player.lastKey && $('#p-live')){ $('#p-live').innerHTML = playerLiveHTML(); return; }
   render();
 }
-function leaveRoom(){ if(player && player.peer){ try{ player.peer.destroy(); }catch(e){} } player = null; render(); }
+function leaveRoom(){ if(player && player.peer){ try{ player.peer.destroy(); }catch(e){} } if(player && player.dl) dlStop(player.dl); player = null; render(); }
+
+/* --- 参加者：カードデータの受け取り（主催者から届くチャンクは cleanState を通らないので、ここで型・範囲・大きさを確かめる） --- */
+async function playerReqData(){
+  const P = player;
+  const can = () => player === P && P.conn && P.conn.open && P.state && P.state.phase === 'lobby' && P.state.share && dlCanAsk(P.dl);
+  if(!can()) return;
+  const saved = await store.get('cards');
+  if(saved && saved.length && !confirm(`この端末にはすでに${saved.length}枚のカードデータが保存されています。受け取ったデータで上書きしますか？上書きすると元に戻せません。`)) return;
+  if(!can()) return;
+  const d = P.dl = {status:'wait', id:'', n:0, parts:[], got:0, size:0, timer:0, limit:0, msg:'', ok:0, errs:[]};
+  dlArm(P);
+  // 受信全体の締め切り（チャンクが少しずつ届き続けても、5分で打ち切る）
+  d.limit = setTimeout(() => { if(player === P && P.dl === d && (d.status === 'wait' || d.status === 'recv')) dlFail(P, '5分以内に受け取り終わらなかったため、受け取りを中断しました。', true); }, DATA_RECV_MS);
+  try{ P.conn.send({t:'data-req'}); }catch(e){}
+  dlShow();
+}
+// 頼めるのは、まだ頼んでいない・混雑と言われた・やり直せる中断のあと
+const dlCanAsk = d => !d || d.status === 'busy' || (d.status === 'error' && d.retry);
+// 最後にチャンクを受け付けてから（または頼んでから）30秒たったら中断する
+function dlArm(P){
+  clearTimeout(P.dl.timer);
+  const d = P.dl;
+  d.timer = setTimeout(() => { if(player === P && P.dl === d && (d.status === 'wait' || d.status === 'recv')) dlFail(P, '30秒間データが届かなかったため、受け取りを中断しました。', true); }, DATA_TIMEOUT);
+}
+const dlStop = d => { clearTimeout(d.timer); clearTimeout(d.limit); };
+function dlFail(P, msg, retry = false){ const d = P.dl; dlStop(d); d.status = 'error'; d.msg = msg; d.retry = retry; d.parts = []; if(player === P) dlShow(); }
+// 主催者からの中止の理由。知らない理由は既定の文言にする。主催者が数えない中止（limit・too-big 以外）は、もう一度頼める
+const ABORT_TEXT = {
+  start:'大会が始まったため、主催者が送信を中止しました。', off:'主催者が「参加者にカードデータを渡す」をオフにしたため、送信が中止されました。',
+  reset:'主催者がカードデータを消したため、送信が中止されました。', 'too-big':'カードデータが大きすぎるため、主催者は送信できませんでした。',
+  timeout:'送信に時間がかかりすぎたため、主催者が送信を中止しました。', limit:'この部屋でカードデータを受け取れる回数を超えたため、送信されませんでした。'
+};
+const ABORT_RETRY = ['start', 'off', 'reset', 'timeout'];
+function dlShow(){ const el = $('#p-dl'); if(tab === 'party' && el) el.innerHTML = dlHTML(); }
+function playerOnDataMsg(m){
+  const P = player, d = P.dl;
+  if(!d || (d.status !== 'wait' && d.status !== 'recv')) return;  // data-req を送っていないときは無視
+  if(m.t === 'data-busy'){ if(d.status === 'wait'){ dlStop(d); d.status = 'busy'; dlShow(); } return; }
+  if(m.t === 'data-abort'){ const r = typeof m.reason === 'string' ? m.reason : ''; dlFail(P, own(ABORT_TEXT, r) || '主催者が送信を中止しました。', ABORT_RETRY.includes(r)); return; }
+  if(!P.state || P.state.phase !== 'lobby' || !P.state.share) return;  // 許可されていないときのチャンクは無視
+  const i = m.i, n = m.n, s = m.s, id = m.id;
+  if(!Number.isInteger(i) || !Number.isInteger(n) || i < 0 || i >= n || n > DATA_MAX_N) return;
+  if(typeof s !== 'string' || s.length > DATA_MAX_CHUNK || typeof id !== 'string' || !id || id.length > 40) return;
+  if(d.status === 'wait'){ if(i !== 0) return; d.status = 'recv'; d.id = id; d.n = n; d.parts = new Array(n); }  // 新しい受信は先頭のチャンクからだけ始める
+  else if(id !== d.id || n !== d.n || d.parts[i] !== undefined) return;  // 別の id・重複は捨てる
+  if(d.size + s.length > DATA_MAX_TOTAL){ dlFail(P, '受け取ったデータが大きすぎるため、中断しました。'); return; }
+  d.parts[i] = s; d.size += s.length; d.got++;
+  if(d.got < d.n){ dlArm(P); dlShow(); return; }
+  dlStop(d);
+  dlFinish(P);
+}
+// 受信した行は、使う列だけを文字列にそろえてから CSV と同じ importRows に通す
+const cleanRow = r => isObj(r) && !Array.isArray(r) ? Object.fromEntries(DATA_COLS.map(k => [k, str(own(r, k), DATA_MAX_FIELD)])) : {};
+async function dlFinish(P){
+  const d = P.dl;
+  d.status = 'saving'; dlShow();
+  let rows;
+  try{ rows = JSON.parse(d.parts.join('')); }catch(e){ dlFail(P, '受け取ったデータを読み取れませんでした。'); return; }
+  d.parts = [];
+  if(!Array.isArray(rows) || rows.length > DATA_MAX_ROWS){ dlFail(P, `受け取ったデータの形式が正しくないか、${DATA_MAX_ROWS}件を超えています。`); return; }
+  const {out, errs} = importRows(rows.map(cleanRow));
+  if(!out.length){ dlFail(P, '取り込めるカードがありませんでした。'); return; }  // 0件のときは報告を残さない
+  importReport = {file:'主催者から受け取ったデータ', ok:out.length, errs, note:'次にこのページ（?room なし）を開いたときから使われます。'};
+  // 保存の成否は cards の保存で判定する（source は補助の印）
+  if(!await store.set('cards', out)){ dlFail(P, 'この端末のブラウザに保存できませんでした。'); return; }
+  await store.set('source', 'csv');
+  d.status = 'done'; d.ok = out.length; d.errs = errs;
+  if(player === P) dlShow();
+}
+function dlHTML(){
+  const d = player.dl, s = player.state;
+  const btn = s && s.phase === 'lobby' && s.share && dlCanAsk(d) ? '<button class="btn" data-act="p-data" style="width:100%">カードデータを受け取る</button>' : '';
+  if(!d) return btn;
+  if(d.status === 'wait') return '<p class="note">主催者にカードデータを頼んでいます…</p>';
+  if(d.status === 'recv') return `<p class="note">カードデータを受信しています… ${esc(d.got)} / ${esc(d.n)}</p>`;
+  if(d.status === 'saving') return '<p class="note">受け取ったデータを確かめて保存しています…</p>';
+  if(d.status === 'busy') return `<p class="note">主催者がほかの参加者に送っています。少し待ってから、もう一度押してください。</p>${btn}`;
+  if(d.status === 'error') return `<p class="ng">${esc(d.msg)}</p>${btn ? `<p class="note">主催者が渡す設定をオンにしているロビー中なら、もう一度受け取れます。</p>${btn}` : ''}`;
+  return `<p class="ok">${esc(d.ok)}枚を保存しました。大会が終わったら、このページ（?room なし）を開くと一人用クイズで遊べます。</p>
+    ${d.errs.length ? `<p class="note"><span class="ng">${esc(d.errs.length)}件</span>は取り込めませんでした。</p><ul class="errlist">${d.errs.slice(0, 20).map(e => `<li>${esc(e.line)}行目 ${esc(e.name)}：${esc(e.problems.join('、'))}</li>`).join('')}</ul>` : ''}
+    <p style="margin-top:8px"><a class="btn" href="${esc(location.pathname)}" target="_blank" rel="noopener">一人用クイズを開く（別のタブ）</a></p>`;
+}
 function playerLiveHTML(){
   const s = player.state;
   if(s.phase === 'lobby') return `<h3>参加者 ${esc(s.online)}人</h3><div class="plist">${s.board.map(r => `<span class="pchip ${r.online ? '' : 'off'}">${esc(r.name)}</span>`).join('')}</div>`;
@@ -1087,7 +1258,7 @@ function playerHTML(){
   const s = P.state;
   if(!s) return waitingHTML('主催者からの応答を待っています…');
   const top = `<div class="qbar"><span><b>${esc(s.me.name)}</b>　${esc(s.me.score)}点・${esc(s.me.rank)}位</span>${leave}</div>`;
-  if(s.phase === 'lobby') return `${top}${waitingHTML('参加しました。主催者が始めるのを待っています。')}<div id="p-live">${playerLiveHTML()}</div>`;
+  if(s.phase === 'lobby') return `${top}${waitingHTML('参加しました。主催者が始めるのを待っています。')}<div id="p-dl" style="margin-bottom:16px">${dlHTML()}</div><div id="p-live">${playerLiveHTML()}</div>`;
   if(s.phase === 'question'){
     const q = s.q || {};
     const isNum = q.fmt === 'num';
@@ -1155,7 +1326,7 @@ function afterPartyRender(){
   }
   if(player && player.state){
     const s = player.state;
-    player.lastKey = `${player.status}|${s.phase}|${s.idx}|${s.me && s.me.answered}`;
+    player.lastKey = `${player.status}|${s.phase}|${s.idx}|${s.me && s.me.answered}|${s.share}`;
     const i = $('#p-answer'); if(i) i.focus({preventScroll:true});
   } else if(player) player.lastKey = '';
 }
@@ -1213,7 +1384,7 @@ document.addEventListener('click', e => {
     case 'search-to-quiz': searchRange = new Set(lastResults.map(c => c.id)); quizCfg.civs = []; quizCfg.set = ''; saveCfg(); tab = 'quiz'; quizView = 'setup'; render(); window.scrollTo(0, 0); break;
     case 'reset-data':
       if(host && host.phase !== 'lobby'){ importReport = {fatal:'大会の進行中はカードデータを入れ替えられません。大会が終わってから元に戻してください。'}; render(); break; }
-      (async () => { await store.del('cards'); cards = SAMPLE.map(prepCard); dataSource = 'sample'; searchRange = null; session = null; quizView = 'setup'; importReport = null; rebuild(); render(); })(); break;
+      (async () => { await store.del('cards'); cards = SAMPLE.map(prepCard); dataSource = 'sample'; searchRange = null; session = null; quizView = 'setup'; importReport = null; rebuild(); if(host){ host.share = false; hostSync(); } render(); })(); break;
     case 'copy-tpl': (async () => { try{ await navigator.clipboard.writeText(TEMPLATE); t.textContent = 'コピーしました'; }catch(err){ t.textContent = 'コピーできませんでした。上の枠から選択してください'; } })(); break;
     case 'goto-quiz': tab = 'quiz'; quizView = 'setup'; render(); window.scrollTo(0, 0); break;
     case 'pcfg': { const k = t.dataset.k, val = k === 'mode' ? v : Number(v); partyCfg[k] = val; saveJSON('dmpq-party', partyCfg); if(host && host.phase === 'lobby') host.cfg[k] = val; render(); if(host && $('details.panel')) $('details.panel').open = true; } break;
@@ -1221,7 +1392,7 @@ document.addEventListener('click', e => {
     case 'host-start': partyError = ''; hostStart(); window.scrollTo(0, 0); break;
     case 'host-close-q': closeQuestion(); break;
     case 'host-next': hostNext(); window.scrollTo(0, 0); break;
-    case 'host-back': host.phase = 'lobby'; hostSync(); break;
+    case 'host-back': host.phase = 'lobby'; host.share = false; hostSync(); break;
     case 'host-close': if(confirm('部屋を閉じますか？参加者との接続が切れます。')) closeRoom(); break;
     case 'copy-url': (async () => { try{ await navigator.clipboard.writeText(joinURL(host.code)); t.textContent = 'コピーしました'; }catch(err){ t.textContent = 'コピーできませんでした'; } })(); break;
     case 'join': joinRoom($('#j-code').value, $('#j-name').value); break;
@@ -1229,7 +1400,9 @@ document.addEventListener('click', e => {
     case 'leave': if(player && player.status === 'joined' && !confirm('大会から退出しますか？')) break; leaveRoom(); break;
     case 'p-submit': playerSubmit($('#p-answer').value); break;
     case 'p-choose': playerSubmit(player.state.q.choices[Number(t.dataset.i)]); break;
-    case 'reset-stats': if(confirm('これまでの成績と苦手記録を消しますか？')){ stats = {total:0, correct:0, cards:{}}; saveJSON('dmpq-stats', stats); render(); } break;
+    case 'p-data': playerReqData(); break;
+    case 'host-data-reset': if(host){ host.dataCount = 0; host.dataStarts.clear(); hostDataShow(); } break;
+    case 'reset-stats': if(confirm('これまでの成績と苦手記録を消しますか？')){ stats = {total:0, correct:0, cards:statCards(null)}; saveJSON('dmpq-stats', stats); render(); } break;
   }
 });
 document.addEventListener('input', e => {
@@ -1241,6 +1414,7 @@ document.addEventListener('change', e => {
   if(el.dataset.s){ search[el.dataset.s] = el.value; updateResults(); return; }
   if(el.dataset.bind === 'qset'){ quizCfg.set = el.value; saveCfg(); render(); return; }
   if(el.id === 'csvfile' && el.files[0]){ handleFile(el.files[0]); return; }
+  if(el.hasAttribute && el.hasAttribute('data-pshare')){ if(host && host.phase === 'lobby'){ host.share = el.checked && dataSource === 'csv'; hostSync(); } return; }
   if(el.hasAttribute && el.hasAttribute('data-pbonus')){ partyCfg.bonus = el.checked; saveJSON('dmpq-party', partyCfg); if(host && host.phase === 'lobby') host.cfg.bonus = el.checked; return; }
   if(el.dataset.set){
     const k = el.dataset.set;
