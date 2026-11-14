@@ -1,0 +1,5 @@
+# 公開するのは index.html・README.md・.gitignore だけ
+*
+!.gitignore
+!index.html
+!README.md

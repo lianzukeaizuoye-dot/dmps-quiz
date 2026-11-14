@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>デュエプレ クイズ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#EEF1F7; --surface:#FFFFFF; --surface2:#E4E8F2; --ink:#151B33; --sub:#59627F; --line:#CDD3E2;
+  --primary:#2A3A9E; --on-primary:#FFFFFF; --primary-soft:#DDE2F7;
+  --g-great:#B07D00; --g-good:#1E6FD9; --g-tri:#C25F00; --g-bad:#CF2B2B;
+  --c-light:#E0B000; --c-light-ink:#3A2E00; --c-water:#1F7AE0; --c-dark:#5A4475; --c-fire:#DD3324; --c-nature:#2E9A46; --c-zero:#8A8FA3;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1328; --surface:#191F3D; --surface2:#232A4E; --ink:#ECEFFA; --sub:#9BA4C6; --line:#2E3762;
+    --primary:#8EA0FF; --on-primary:#0F1328; --primary-soft:#28305A;
+    --g-great:#F2C230; --g-good:#6AA8FF; --g-tri:#FFA94D; --g-bad:#FF6B6B;
+    --c-dark:#8B6FB0;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1328; --surface:#191F3D; --surface2:#232A4E; --ink:#ECEFFA; --sub:#9BA4C6; --line:#2E3762;
+  --primary:#8EA0FF; --on-primary:#0F1328; --primary-soft:#28305A;
+  --g-great:#F2C230; --g-good:#6AA8FF; --g-tri:#FFA94D; --g-bad:#FF6B6B;
+  --c-dark:#8B6FB0;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:'Zen Kaku Gothic New','Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Yu Gothic',Meiryo,sans-serif;
+  font-size:16px; line-height:1.65; -webkit-text-size-adjust:100%;
+}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.display{font-family:'Dela Gothic One','Hiragino Kaku Gothic StdN','Noto Sans JP',sans-serif;font-weight:400;letter-spacing:.02em}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+header.top .inner{max-width:560px;margin:0 auto;padding:10px 16px;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+header.top h1{margin:0;font-size:20px;line-height:1.3}
+header.top .meta{font-size:13px;color:var(--sub)}
+main{max-width:560px;margin:0 auto;padding:20px 16px calc(96px + env(safe-area-inset-bottom,0px))}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav.tabs .inner{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+nav.tabs button{appearance:none;border:0;background:none;color:var(--sub);font:inherit;font-weight:700;font-size:14px;padding:14px 0 12px;border-top:3px solid transparent;cursor:pointer}
+nav.tabs button.on{color:var(--primary);border-top-color:var(--primary)}
+h2{font-size:22px;line-height:1.35;margin:0 0 4px}
+h3{font-size:15px;margin:0 0 8px;color:var(--sub);font-weight:700}
+p{margin:0 0 12px}
+.lead{color:var(--sub);font-size:14px;margin-bottom:20px}
+section.block{margin:0 0 24px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+button{font:inherit}
+.btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 18px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;cursor:pointer;text-decoration:none}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.btn.big{min-height:54px;font-size:17px;width:100%}
+.btn.ghost{background:none;border-color:transparent;color:var(--primary);padding:0 8px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,nav.tabs button:focus-visible,.opt:focus-visible,.chip:focus-visible,input:focus-visible,select:focus-visible,.cardrow:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row > .btn{flex:1 1 0}
+.opts{display:grid;gap:8px}
+.opt{appearance:none;display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.opt b{display:block;font-size:16px}
+.opt small{display:block;color:var(--sub);font-size:13px}
+.opt .cnt{font-size:13px;color:var(--sub);white-space:nowrap}
+.opt.on{border-color:var(--primary);background:var(--primary-soft);box-shadow:inset 4px 0 0 var(--primary)}
+.opt.on .cnt{color:var(--ink);font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{appearance:none;min-height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;font-weight:700;font-size:14px;display:inline-flex;align-items:center;gap:6px}
+.chip.on{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{appearance:none;border:0;background:none;color:var(--ink);min-height:42px;font-weight:700;cursor:pointer;border-left:1px solid var(--line)}
+.seg button:first-child{border-left:0}
+.seg button.on{background:var(--primary);color:var(--on-primary)}
+.note{font-size:13px;color:var(--sub);margin-top:8px}
+.banner{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-radius:10px;background:var(--primary-soft);font-size:14px;margin-bottom:12px}
+select,input[type=text],input[type=number],input[type=search]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;min-height:44px;padding:0 12px;width:100%}
+label.field{display:block;font-size:13px;color:var(--sub);font-weight:700}
+label.field > *{margin-top:4px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rangebox{display:flex;align-items:center;gap:8px}
+.rangebox span{color:var(--sub)}
+
+/* civ pips */
+.pips{display:inline-flex;gap:3px;vertical-align:middle}
+.pip{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;font-size:12px;font-weight:700;color:#fff;line-height:1}
+.pips.lg .pip{width:44px;height:44px;font-size:22px}
+.civ-light{background:var(--c-light);color:var(--c-light-ink)}
+.civ-water{background:var(--c-water)}
+.civ-dark{background:var(--c-dark)}
+.civ-fire{background:var(--c-fire)}
+.civ-nature{background:var(--c-nature)}
+.civ-zero,.civ-other{background:var(--c-zero)}
+.chip .pip{width:20px;height:20px;font-size:11px}
+
+/* quiz */
+.qbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;font-size:14px;color:var(--sub)}
+.qbar b{color:var(--ink)}
+.progress{height:4px;background:var(--surface2);border-radius:2px;margin:-6px 0 18px;overflow:hidden}
+.progress span{display:block;height:100%;background:var(--primary)}
+.clue{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 18px;margin-bottom:16px}
+.ask{font-weight:700;font-size:15px;color:var(--sub);margin-bottom:12px}
+blockquote.ft{margin:0;font-size:19px;line-height:1.8;font-style:italic;border-left:4px solid var(--primary);padding:2px 0 2px 14px}
+.cardtext{font-size:16px;line-height:1.8;white-space:normal}
+.spec{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.spec-num{display:flex;flex-direction:column;line-height:1.2}
+.spec-num .k{font-size:12px;color:var(--sub);font-weight:700}
+.spec-num .v{font-family:'Dela Gothic One',sans-serif;font-size:34px}
+dl.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0;font-size:17px}
+dl.facts dt{color:var(--sub);font-size:14px;font-weight:700;align-self:center}
+dl.facts dd{margin:0;font-weight:700}
+.qname{font-size:22px;font-weight:700;margin:0 0 6px}
+.hint{font-size:14px;background:var(--surface2);border-radius:8px;padding:8px 12px;margin:14px 0 0}
+.answerbox{display:flex;gap:8px}
+.answerbox input{flex:1;min-height:52px;font-size:18px}
+.answerbox .btn{min-height:52px}
+.choices{display:grid;gap:8px}
+.choices .btn{min-height:52px;justify-content:flex-start;text-align:left;font-size:16px;padding:8px 16px}
+.subacts{display:flex;justify-content:space-between;margin-top:10px}
+
+/* result */
+.result{text-align:center;padding:8px 0 4px}
+.stamp{display:inline-grid;place-items:center;width:150px;height:150px;border-radius:50%;border:6px solid currentColor;font-family:'Dela Gothic One',sans-serif;font-size:84px;line-height:1;transform:rotate(-10deg);margin:6px auto 10px;animation:stamp .32s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes stamp{from{transform:rotate(-10deg) scale(1.6);opacity:0}to{transform:rotate(-10deg) scale(1);opacity:1}}
+@media (prefers-reduced-motion: reduce){.stamp{animation:none}}
+.g-great{color:var(--g-great)} .g-good{color:var(--g-good)} .g-tri{color:var(--g-tri)} .g-bad{color:var(--g-bad)}
+.verdict{font-family:'Dela Gothic One',sans-serif;font-size:26px;margin:0 0 4px}
+.msg{font-size:15px;color:var(--sub)}
+dl.answer{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:16px 0;display:grid;grid-template-columns:auto 1fr;gap:6px 14px}
+dl.answer dt{color:var(--sub);font-size:13px;font-weight:700;padding-top:3px}
+dl.answer dd{margin:0}
+dl.answer small{display:block;color:var(--sub);font-size:13px}
+
+/* summary */
+.tally{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 20px}
+.tally div{background:var(--surface);border:1px solid var(--line);border-radius:12px;text-align:center;padding:10px 4px}
+.tally .s{font-family:'Dela Gothic One',sans-serif;font-size:28px;line-height:1.2}
+.tally .n{font-weight:700;font-size:18px}
+.score{font-family:'Dela Gothic One',sans-serif;font-size:56px;line-height:1.1;margin:4px 0}
+.score small{font-family:inherit;font-size:20px;margin-left:4px}
+
+/* card list */
+.reshead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:18px 0 8px}
+.reshead b{font-size:15px}
+ul.cardlist{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+ul.cardlist li + li{border-top:1px solid var(--line)}
+.cardrow{appearance:none;width:100%;display:grid;grid-template-columns:34px 1fr auto auto;align-items:center;gap:10px;padding:10px 14px;background:none;border:0;color:var(--ink);text-align:left;cursor:pointer}
+.costbadge{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--surface2);font-family:'Dela Gothic One',sans-serif;font-size:15px}
+.cardrow .nm{min-width:0}
+.cardrow .nm b{display:block;font-size:15px;line-height:1.35;overflow-wrap:anywhere}
+.cardrow .nm small{color:var(--sub);font-size:12px}
+.cardrow .pw{font-size:14px;font-weight:700;color:var(--sub);min-width:48px;text-align:right}
+.empty{padding:28px 16px;text-align:center;color:var(--sub);background:var(--surface);border:1px dashed var(--line);border-radius:12px}
+
+/* sheet */
+.sheet-wrap{position:fixed;inset:0;z-index:20;background:rgba(10,14,30,.5);display:flex;align-items:flex-end;justify-content:center}
+.sheet-wrap[hidden]{display:none}
+.sheet{background:var(--bg);width:100%;max-width:560px;max-height:88vh;overflow:auto;border-radius:18px 18px 0 0;padding:18px 18px calc(24px + env(safe-area-inset-bottom,0px))}
+.sheet .close{float:right}
+.sheet h2{font-size:22px;margin-right:60px}
+.sheet .reading{color:var(--sub);font-size:14px;margin-bottom:10px}
+.statsgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}
+.statsgrid div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center}
+.statsgrid .k{display:block;font-size:11.5px;color:var(--sub);font-weight:700}
+.statsgrid .v{font-weight:700;font-size:16px;overflow-wrap:anywhere}
+.textbox{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;font-size:15px}
+.textbox.ft{font-style:italic;color:var(--sub)}
+
+/* data */
+pre.tpl{background:var(--surface2);border-radius:8px;padding:10px 12px;font-size:12px;overflow-x:auto;white-space:pre;margin:0 0 10px}
+.errlist{margin:10px 0 0;padding:0;list-style:none;font-size:13px;max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.errlist li{padding:6px 10px;border-top:1px solid var(--line)}
+.errlist li:first-child{border-top:0}
+.ok{color:var(--g-good);font-weight:700}
+.ng{color:var(--g-bad);font-weight:700}
+.setrow{display:grid;grid-template-columns:1fr 96px;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.setrow:first-of-type{border-top:0}
+.setrow small{display:block;color:var(--sub);font-size:12px}
+.check{display:flex;align-items:center;gap:10px;padding:10px 0;font-size:14px;border-top:1px solid var(--line)}
+.check input{width:22px;height:22px}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* party */
+body.player-mode nav.tabs{display:none}
+body.player-mode main{padding-bottom:calc(32px + env(safe-area-inset-bottom,0px))}
+.bigcode{font-family:'Dela Gothic One',sans-serif;font-size:clamp(48px,15vw,76px);letter-spacing:.14em;line-height:1.1;margin:0 0 12px}
+.qrbox{background:#fff;padding:12px;border-radius:12px;display:inline-block;line-height:0}
+.qrbox img,.qrbox canvas{width:180px;height:180px}
+.joinurl{font-size:13px;word-break:break-all;color:var(--sub);margin:10px 0}
+.plist{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.pchip{padding:6px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-weight:700;font-size:14px}
+.pchip.off{opacity:.45}
+.pchip.done{border-color:var(--primary);background:var(--primary-soft)}
+.timer{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.tnum{font-family:'Dela Gothic One',sans-serif;font-size:30px;min-width:2.2ch;text-align:right;line-height:1}
+.tbar{flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden}
+.tbar span{display:block;height:100%;background:var(--primary);transition:width .2s linear}
+.clue.big blockquote.ft{font-size:24px}
+.clue.big .cardtext{font-size:20px}
+.clue.big .qname{font-size:28px}
+ol.board,ul.reslist{list-style:none;margin:0 0 16px;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+ol.board li,ul.reslist li{display:grid;grid-template-columns:2.4em 1fr auto;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid var(--line)}
+ol.board li:first-child,ul.reslist li:first-child{border-top:0}
+ol.board .rk,ul.reslist .rg{font-family:'Dela Gothic One',sans-serif;font-size:20px;text-align:center}
+ol.board .sc,ul.reslist .rp{font-weight:700;white-space:nowrap}
+ol.board li.me{background:var(--primary-soft)}
+ol.board li.off{opacity:.5}
+ul.reslist small{display:block;color:var(--sub);font-size:13px;overflow-wrap:anywhere}
+.waiting{text-align:center;padding:32px 16px;color:var(--sub);background:var(--surface);border:1px dashed var(--line);border-radius:12px;margin-bottom:16px}
+.pts{font-family:'Dela Gothic One',sans-serif;font-size:32px;margin:0}
+.correct-big{text-align:center;margin:4px 0 18px}
+.correct-big .k{font-size:13px;color:var(--sub);font-weight:700}
+.correct-big .v{font-family:'Dela Gothic One',sans-serif;font-size:clamp(24px,7vw,34px);line-height:1.3;margin:2px 0}
+.correct-big small{color:var(--sub)}
+</style>
+</head>
+<body>
+<header class="top"><div class="inner"><h1 class="display">デュエプレ クイズ</h1><span class="meta" id="meta"></span></div></header>
+<main id="main"><p class="lead">カードデータを読み込んでいます…</p></main>
+<nav class="tabs" aria-label="画面の切り替え"><div class="inner">
+  <button data-tab="quiz" class="on">クイズ</button>
+  <button data-tab="party">大会</button>
+  <button data-tab="search">検索</button>
+  <button data-tab="data">データ</button>
+</div></nav>
+<div class="sheet-wrap" id="sheet" hidden><div class="sheet" role="dialog" aria-modal="true" aria-label="カード詳細" id="sheet-body"></div></div>
+
+<script>
+/* ===== サンプルデータ（すべて架空のカード） ===== */
+const SAMPLE = [
+ {id:'S-001',name:'炎牙の剣士ガルド',reading:'えんがのけんしがるど',type:'クリーチャー',civ:'火',cost:3,power:3000,text:'■スピードアタッカー',rarity:'C',set:'第1弾',flavor:'剣を抜くより先に、炎が走る。'},
+ {id:'S-002',name:'炎牙の剣士ガルドX',reading:'えんがのけんしがるどえっくす',type:'クリーチャー',civ:'火',cost:5,power:6000,text:'■スピードアタッカー\n■W・ブレイカー',rarity:'VR',set:'第2弾',flavor:'二度目の炎は、もう止まらない。'},
+ {id:'S-003',name:'爆炎竜ヴォルガノス',reading:'ばくえんりゅうゔぉるがのす',type:'クリーチャー',civ:'火',cost:7,power:9000,text:'■W・ブレイカー\n■このクリーチャーが攻撃する時、相手のパワー5000以下のクリーチャーを1体破壊する。',rarity:'SR',set:'第1弾',flavor:'山がひとつ、朝には消えていた。'},
+ {id:'S-004',name:'火花の小鬼ピッチ',reading:'ひばなのこおにぴっち',type:'クリーチャー',civ:'火',cost:2,power:2000,text:'■このクリーチャーはブロックされない。',rarity:'C',set:'第1弾',flavor:'小さな火種ほど、よく笑う。'},
+ {id:'S-005',name:'フレイム・バースト',reading:'ふれいむばーすと',type:'呪文',civ:'火',cost:4,power:null,text:'■S・トリガー\n■相手のパワー4000以下のクリーチャーを1体破壊する。',rarity:'U',set:'第1弾',flavor:'一瞬で、すべてが赤く染まった。'},
+ {id:'S-006',name:'蒼海の賢者ミルル',reading:'そうかいのけんじゃみるる',type:'クリーチャー',civ:'水',cost:3,power:2000,text:'■このクリーチャーをバトルゾーンに出した時、カードを1枚引く。',rarity:'U',set:'第1弾',flavor:'答えはいつも、波の下にある。'},
+ {id:'S-007',name:'深淵の監視者アクアリス',reading:'しんえんのかんししゃあくありす',type:'クリーチャー',civ:'水',cost:5,power:4000,text:'■ブロッカー\n■このクリーチャーをバトルゾーンに出した時、相手のクリーチャーを1体手札に戻す。',rarity:'R',set:'第1弾',flavor:'見ているのではない。見通しているのだ。'},
+ {id:'S-008',name:'アクア・スパイラル',reading:'あくあすぱいらる',type:'呪文',civ:'水',cost:3,power:null,text:'■S・トリガー\n■クリーチャーを1体選び、持ち主の手札に戻す。',rarity:'C',set:'第1弾',flavor:'渦は、すべてを元の場所へ返す。'},
+ {id:'S-009',name:'潮騒のサイバー・ルーラー',reading:'しおさいのさいばーるーらー',type:'クリーチャー',civ:'水',cost:6,power:6000,text:'■W・ブレイカー\n■このクリーチャーが攻撃する時、カードを2枚まで引いてもよい。',rarity:'VR',set:'第2弾',flavor:'情報の海に、溺れる者はいない。'},
+ {id:'S-010',name:'光翼の守護者セラフィナ',reading:'こうよくのしゅごしゃせらふぃな',type:'クリーチャー',civ:'光',cost:4,power:5000,text:'■ブロッカー\n■このクリーチャーは相手プレイヤーを攻撃できない。',rarity:'C',set:'第1弾',flavor:'翼は、誰かを守るためにある。'},
+ {id:'S-011',name:'聖天使アルカディオン',reading:'せいてんしあるかでぃおん',type:'クリーチャー',civ:'光',cost:8,power:11500,text:'■ブロッカー\n■T・ブレイカー\n■相手の呪文を唱えるコストは2多くなる。',rarity:'SR',set:'第2弾',flavor:'天の秩序は、ただ一つ。'},
+ {id:'S-012',name:'ホーリー・レイ',reading:'ほーりーれい',type:'呪文',civ:'光',cost:6,power:null,text:'■S・トリガー\n■相手のクリーチャーをすべてタップする。',rarity:'R',set:'第1弾',flavor:'光に打たれた者は、膝をつくしかない。'},
+ {id:'S-013',name:'光翼の守護者セラフィム',reading:'こうよくのしゅごしゃせらふぃむ',type:'クリーチャー',civ:'光',cost:4,power:4500,text:'■ブロッカー',rarity:'U',set:'第2弾',flavor:'二枚目の翼は、少しだけ重い。'},
+ {id:'S-014',name:'黒霧の死神ゾルグ',reading:'くろぎりのしにがみぞるぐ',type:'クリーチャー',civ:'闇',cost:6,power:7000,text:'■W・ブレイカー\n■このクリーチャーが破壊された時、相手のクリーチャーを1体破壊する。',rarity:'VR',set:'第1弾',flavor:'霧が晴れたとき、そこには誰もいない。'},
+ {id:'S-015',name:'骨鳴りのスケルトン',reading:'ほねなりのすけるとん',type:'クリーチャー',civ:'闇',cost:1,power:1000,text:'■このクリーチャーはブロックできない。',rarity:'C',set:'第1弾',flavor:'カラカラと、夜通し鳴り止まない。'},
+ {id:'S-016',name:'デス・ハンド',reading:'ですはんど',type:'呪文',civ:'闇',cost:5,power:null,text:'■S・トリガー\n■相手のクリーチャーを1体破壊する。',rarity:'R',set:'第1弾',flavor:'掴まれた魂は、二度と戻らない。'},
+ {id:'S-017',name:'冥府の門番ケルベス',reading:'めいふのもんばんけるべす',type:'クリーチャー',civ:'闇',cost:4,power:4000,text:'■ブロッカー\n■このクリーチャーはバトルの後、破壊される。',rarity:'C',set:'第2弾',flavor:'三つの首が、同時にうなずいた。'},
+ {id:'S-018',name:'大地の巨獣ガイアモス',reading:'だいちのきょじゅうがいあもす',type:'クリーチャー',civ:'自然',cost:6,power:8000,text:'■W・ブレイカー',rarity:'U',set:'第1弾',flavor:'歩くたびに、地図が書き換わる。'},
+ {id:'S-019',name:'森の囁きリーフィ',reading:'もりのささやきりーふぃ',type:'クリーチャー',civ:'自然',cost:2,power:1000,text:'■このクリーチャーをバトルゾーンに出した時、自分の山札の上から1枚目をマナゾーンに置く。',rarity:'C',set:'第1弾',flavor:'耳を澄ませば、森が道を教えてくれる。'},
+ {id:'S-020',name:'ナチュラル・ブースト',reading:'なちゅらるぶーすと',type:'呪文',civ:'自然',cost:2,power:null,text:'■S・トリガー\n■自分の山札の上から1枚目をマナゾーンに置く。',rarity:'C',set:'第1弾',flavor:'芽吹きは、いつも突然だ。'},
+ {id:'S-021',name:'猛進のビーストホーン',reading:'もうしんのびーすとほーん',type:'クリーチャー',civ:'自然',cost:5,power:6000,text:'■パワーアタッカー+2000',rarity:'U',set:'第2弾',flavor:'角が触れたものは、すべて道になる。'},
+ {id:'S-022',name:'紅蓮と蒼波の双竜ツインヴァルド',reading:'ぐれんとそうはのそうりゅうついんゔぁるど',type:'クリーチャー',civ:'水/火',cost:7,power:9000,text:'■W・ブレイカー\n■このクリーチャーをバトルゾーンに出した時、カードを1枚引く。その後、相手のパワー3000以下のクリーチャーを1体破壊する。',rarity:'SR',set:'第2弾',flavor:'炎と水が手を結ぶとき、世界は沸騰する。'},
+ {id:'S-023',name:'光闇の審判者ジャッジメント',reading:'こうあんのしんぱんしゃじゃっじめんと',type:'クリーチャー',civ:'光/闇',cost:5,power:5000,text:'■ブロッカー\n■このクリーチャーが破壊された時、カードを1枚引く。',rarity:'VR',set:'第2弾',flavor:'正しさは、いつも二つの顔を持つ。'},
+ {id:'S-024',name:'森炎のハンター・レックス',reading:'しんえんのはんたーれっくす',type:'クリーチャー',civ:'火/自然',cost:4,power:5000,text:'■スピードアタッカー',rarity:'R',set:'第2弾',flavor:'狩りは、燃えるように速く。'},
+ {id:'S-025',name:'蒼海の賢者ミルルEX',reading:'そうかいのけんじゃみるるいーえっくす',type:'クリーチャー',civ:'水',cost:3,power:3000,text:'■このクリーチャーをバトルゾーンに出した時、カードを2枚引く。その後、自分の手札を1枚捨てる。',rarity:'R',set:'第2弾',flavor:'波は、二度目のほうが深い。'},
+ {id:'S-026',name:'ザ・ジャイアント・ロック',reading:'ざじゃいあんとろっく',type:'クリーチャー',civ:'自然',cost:7,power:12000,text:'■T・ブレイカー\n■このクリーチャーは攻撃する時、タップされない。',rarity:'SR',set:'第2弾',flavor:'動かないことが、最大の強さだ。'},
+ {id:'S-027',name:'焦熱のボルトランサー',reading:'しょうねつのぼるとらんさー',type:'クリーチャー',civ:'火',cost:4,power:4000,text:'■このクリーチャーが攻撃する時、相手のパワー2000以下のクリーチャーを1体破壊する。',rarity:'U',set:'第2弾',flavor:'雷よりも速く、炎よりも熱く。'},
+ {id:'S-028',name:'シャドウ・ミラージュ',reading:'しゃどうみらーじゅ',type:'呪文',civ:'闇',cost:3,power:null,text:'■相手は自身の手札を1枚選んで捨てる。',rarity:'C',set:'第2弾',flavor:''},
+ {id:'S-029',name:'鋼鉄の騎士ガラハッド',reading:'こうてつのきしがらはっど',type:'クリーチャー',civ:'光',cost:3,power:3000,text:'■ブロッカー',rarity:'C',set:'第2弾',flavor:'盾は錆びても、誓いは錆びない。'},
+ {id:'S-030',name:'水晶の番兵クリスタ',reading:'すいしょうのばんぺいくりすた',type:'クリーチャー',civ:'水',cost:4,power:4000,text:'■ブロッカー',rarity:'C',set:'第2弾',flavor:'透き通っているからこそ、隠せない。'},
+ {id:'S-031',name:'赤熱の小鬼ポップ',reading:'せきねつのこおにぽっぷ',type:'クリーチャー',civ:'火',cost:2,power:2000,text:'■スピードアタッカー',rarity:'C',set:'第2弾',flavor:'跳ねるたびに、火の粉が増える。'}
+];
+
+/* ===== 基本ユーティリティ ===== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nl = s => s.replace(/\n/g, '<br>');
+const clone = o => JSON.parse(JSON.stringify(o));
+function loadJSON(k, d){ try{ const v = localStorage.getItem(k); return v ? Object.assign(clone(d), JSON.parse(v)) : clone(d); }catch(e){ return clone(d); } }
+function saveJSON(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function shuffle(a){ a = a.slice(); for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const chars = s => Array.from(s);
+/* 受け取った値を安全に扱うための小物（未知のキーや __proto__ などは undefined、数値でなければ 0） */
+const own = (o, k) => o && Object.prototype.hasOwnProperty.call(o, k) ? o[k] : undefined;
+const fin = v => Number.isFinite(v) ? v : 0;
+const str = (v, n) => typeof v === 'string' ? v.slice(0, n) : typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
+
+/* IndexedDB（カードデータ保存用） */
+const store = {
+  db:null,
+  open(){ return new Promise(res => { try{ const r = indexedDB.open('dmp-quiz', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => { this.db = r.result; res(true); }; r.onerror = () => res(false); }catch(e){ res(false); } }); },
+  get(k){ return new Promise(res => { if(!this.db) return res(null); try{ const r = this.db.transaction('kv').objectStore('kv').get(k); r.onsuccess = () => res(r.result ?? null); r.onerror = () => res(null); }catch(e){ res(null); } }); },
+  set(k, v){ return new Promise(res => { if(!this.db) return res(false); try{ const tx = this.db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = () => res(true); tx.onerror = () => res(false); }catch(e){ res(false); } }); },
+  del(k){ return new Promise(res => { if(!this.db) return res(false); try{ const tx = this.db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = () => res(true); tx.onerror = () => res(false); }catch(e){ res(false); } }); }
+};
+
+/* ===== 状態 ===== */
+let settings = loadJSON('dmpq-settings', {th2:0.6, th3:0.3, margin:0.1, article:true});
+let stats = loadJSON('dmpq-stats', {total:0, correct:0, cards:{}});
+let quizCfg = loadJSON('dmpq-quiz', {formats:['ft','spec'], customFields:['civ','cost','power'], civs:[], set:'', count:10, mode:'free'});
+let cards = [], byId = new Map(), dataSource = 'sample';
+let UNIQ = {}, customCache = null, NAME_SET = new Set();
+let tab = 'quiz', quizView = 'setup', session = null, searchRange = null, importReport = null;
+let search = {name:'', text:'', civs:[], civMode:'any', cmin:'', cmax:'', pmin:'', pmax:'', type:'', rarity:'', set:'', sort:'cost', limit:100};
+
+const CIVS = ['光','水','闇','火','自然'];
+const SOURCE_LABEL = {sample:'架空カードのサンプル', csv:'読み込んだCSV'};
+const CIV_KEY = {光:'light',水:'water',闇:'dark',火:'fire',自然:'nature',ゼロ:'zero'};
+const CIV_ABBR = {自然:'自'};
+const pips = (civs, size = '') => `<span class="pips ${size}">${civs.map(v => `<span class="pip civ-${own(CIV_KEY, v) || 'other'}" title="${esc(v)}" aria-label="${esc(v)}">${esc(own(CIV_ABBR, v) || chars(v)[0] || '')}</span>`).join('')}</span>`;
+const X = '✖\uFE0E';
+const MAX_ANSWER = 150;  // 回答の最大文字数（一人用・大会で共通。実データの最長の名前・読みが入る長さ）
+const GRADE = {'◎':{cls:'g-great',label:'大正解！'}, '○':{cls:'g-good',label:'正解'}, '△':{cls:'g-tri',label:'惜しい！'}, [X]:{cls:'g-bad',label:'不正解'}};
+
+/* ===== 表記の正規化と一致度 ===== */
+const ARTICLE_RE = /^\s*(ザ|the)\s*[・･=＝\s]\s*/i;
+function norm(s){
+  if(!s) return '';
+  s = String(s).normalize('NFKC').toLowerCase();
+  s = s.replace(/[\u30A1-\u30F6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+  s = s.replace(/[‐‑‒–—―−\-〜~]/g, 'ー');
+  s = s.replace(/[\s・･=＝《》〈〉「」『』【】\[\]()（）!！?？、。,.:：;；'"’‘“”☆★♪]/g, '');
+  return s;
+}
+// max を渡すと、距離が max を超えた時点で max + 1 を返す（帯の外は計算しない）。文字列でも文字配列でも受け取る
+function lev(a, b, max = Infinity){
+  if(typeof a === 'string') a = chars(a);
+  if(typeof b === 'string') b = chars(b);
+  const m = a.length, n = b.length;
+  if(Math.abs(m - n) > max) return max + 1;
+  if(!m) return n; if(!n) return m;
+  let prev = new Array(n + 1), cur = new Array(n + 1);
+  for(let j = 0; j <= n; j++) prev[j] = j > max ? Infinity : j;
+  for(let i = 1; i <= m; i++){
+    const lo = Math.max(1, i - max), hi = Math.min(n, i + max);
+    cur[0] = i > max ? Infinity : i; cur[lo - 1] = lo > 1 ? Infinity : cur[0];
+    let rowMin = cur[0];
+    for(let j = lo; j <= hi; j++){
+      const v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      cur[j] = v; if(v < rowMin) rowMin = v;
+    }
+    if(hi < n) cur[hi + 1] = Infinity;
+    if(rowMin > max) return max + 1;
+    [prev, cur] = [cur, prev];
+  }
+  return prev[n] > max ? max + 1 : prev[n];
+}
+// score: 一致度（1 - 編集距離 / 長いほうの文字数）。near: 4文字以上のキーと1文字違い（置換・挿入・削除）
+// floor: これ以下の一致度は要らない。一致度が max(floor, それまでの最良) を超えられなくなる距離で lev を打ち切る
+// （1文字違いを見るため打ち切りは最低1）。score が floor を超えたときだけ、それが正しい最良値になる
+function cardScore(q, c, floor = 0, qc = chars(q)){
+  let best = 0, near = false;
+  const ql = qc.length;
+  for(let i = 0; i < c._keys.length; i++){
+    if(c._keys[i] === q) return {exact:true, score:1, near:false};
+    const kc = c._keyChars[i], kl = kc.length, L = Math.max(ql, kl);
+    const lim = Math.max(1, Math.floor(L * (1 - Math.max(floor, best)) + 1e-9));
+    const d = lev(qc, kc, lim);
+    if(d > lim) continue;
+    const s = L ? 1 - d / L : 0;
+    if(s > best) best = s;
+    if(d === 1 && kl >= 4) near = true;
+  }
+  return {exact:false, score:best, near};
+}
+const nearCard = (qc, c) => c._keyChars.some(kc => kc.length >= 4 && lev(qc, kc, 1) === 1);
+function judgeName(input, ans, hintUsed){
+  const qc = chars(norm(input)).slice(0, MAX_ANSWER), q = qc.join('');  // 長い入力で止まらないように
+  if(!q) return {g:X, msg:'回答が空でした'};
+  const sc = cardScore(q, ans, 0, qc);
+  let res;
+  if(sc.exact) res = {g:'◎'};
+  else {
+    // 正解と1文字違い、または一致度が th3 未満なら、判定に効くのはほかのカードとの完全一致と1文字違いだけ
+    // それ以外は、正解との一致度より margin 以上低いカードは best にしても結果が変わらないので枝刈りする
+    const full = !sc.near && sc.score >= settings.th3, low = sc.score - settings.margin - 1e-9;
+    let best = null, bestS = -1, bestExact = false, near = null;
+    for(const c of cards){
+      if(c === ans || c._norm === ans._norm) continue;
+      if(!full){
+        if(c._keys.includes(q)){ best = c; bestExact = true; break; }
+        if(sc.near && !near && nearCard(qc, c)) near = c;
+        continue;
+      }
+      const f = Math.max(bestS, low), s = cardScore(q, c, f, qc);
+      if(s.exact){ best = c; bestExact = true; break; }
+      if(s.score > f){ bestS = s.score; best = c; }
+    }
+    if(bestExact) res = {g:X, msg:`それは「${best.name}」です`, other:best};
+    else if(sc.near) res = near ? {g:'△', msg:`「${near.name}」とも似ていて、候補が絞れません`, other:near} : {g:'○'};
+    else if(sc.score < settings.th3) res = {g:X};
+    else if(best && bestS - sc.score >= settings.margin) res = {g:X, msg:`もしかして「${best.name}」？`, other:best};
+    else if(best && Math.abs(bestS - sc.score) < settings.margin) res = sc.score >= settings.th2 ? {g:'△', msg:`「${best.name}」とも似ていて、候補が絞れません`, other:best} : bestS >= sc.score ? {g:X, msg:`もしかして「${best.name}」？`, other:best} : {g:X};
+    else if(sc.score >= settings.th2) res = {g:'△'};
+    else res = {g:X};
+  }
+  if(hintUsed && res.g === '◎'){ res.g = '○'; res.msg = 'ヒントを使ったので○です'; }
+  return res;
+}
+
+/* ===== カードの準備と出題索引 ===== */
+const splitList = s => String(s ?? '').split(/[\/／]/).map(x => x.trim()).filter(Boolean);
+function prepCard(r){
+  const c = {
+    id:String(r.id), name:String(r.name ?? '').trim(), reading:String(r.reading ?? '').trim(), type:String(r.type ?? '').trim(),
+    civ:splitList(r.civ), cost:r.cost, power:(r.power === '' || r.power === undefined) ? null : r.power,
+    text:String(r.text ?? '').replace(/\\n/g, '\n').trim(), rarity:String(r.rarity ?? '').trim(), set:splitList(r.set),
+    flavor:String(r.flavor ?? '').replace(/\\n/g, '\n').trim(), twin_id:String(r.twin_id ?? '').trim(), aliases:splitList(r.aliases)
+  };
+  return c;
+}
+function buildKeys(c){
+  const ks = new Set();
+  const add = s => { const n = norm(s); if(n) ks.add(n); };
+  add(c.name); add(c.reading); c.aliases.forEach(add);
+  if(settings.article){
+    const m = c.name.match(ARTICLE_RE);
+    if(m){ add(c.name.slice(m[0].length)); if(c.reading) add(c.reading.replace(/^(ざ|the)/i, '')); }
+  }
+  c._keys = [...ks]; c._keyChars = c._keys.map(chars); c._norm = norm(c.name);
+}
+const civKey = c => [...c.civ].sort().join('/');
+const FIELD = {
+  civ:{label:'文明', get:c => c.civ.length ? civKey(c) : null, show:c => pips(c.civ) + ' ' + esc(c.civ.join('/'))},
+  cost:{label:'コスト', get:c => c.cost, show:c => esc(c.cost)},
+  power:{label:'パワー', get:c => c.power, show:c => esc(c.power)},
+  type:{label:'タイプ', get:c => c.type || null, show:c => esc(c.type)},
+  rarity:{label:'レアリティ', get:c => c.rarity || null, show:c => esc(c.rarity)},
+  set:{label:'収録弾', get:c => c.set.length ? c.set.join('/') : null, show:c => esc(c.set.join('・'))}
+};
+const FMT_KEY = {
+  ft:c => c.flavor ? norm(maskName(c.flavor, c)) : null,
+  text:c => { const t = norm(maskName(c.text, c)); return chars(t).length >= 12 ? t : null; },
+  spec:c => (c.power == null || !c.civ.length) ? null : civKey(c) + '|' + c.cost + '|' + c.power
+};
+function uniqueIds(fn){
+  const m = new Map();
+  for(const c of cards){ const k = fn(c); if(k == null || k === '') continue; const a = m.get(k); a ? a.push(c.id) : m.set(k, [c.id]); }
+  const s = new Set(); for(const a of m.values()) if(a.length === 1) s.add(a[0]); return s;
+}
+function customKeyFn(fields){ return c => { const p = []; for(const f of fields){ const v = FIELD[f].get(c); if(v == null || v === '') return null; p.push(v); } return p.join('|'); }; }
+function customUniq(){
+  const k = quizCfg.customFields.join(',');
+  if(!customCache || customCache.k !== k) customCache = {k, s:quizCfg.customFields.length ? uniqueIds(customKeyFn(quizCfg.customFields)) : new Set()};
+  return customCache.s;
+}
+function rebuild(){
+  cards.forEach(buildKeys);
+  byId = new Map(cards.map(c => [c.id, c]));
+  NAME_SET = new Set(cards.map(c => c._norm).filter(Boolean));
+  for(const f in FMT_KEY) UNIQ[f] = uniqueIds(FMT_KEY[f]);
+  customCache = null;
+  $('#meta').textContent = `${cards.length}枚${dataSource === 'sample' ? '（サンプル）' : ''}`;
+}
+function rangeCards(){
+  return cards.filter(c => (!searchRange || searchRange.has(c.id)) && (!quizCfg.civs.length || c.civ.some(x => quizCfg.civs.includes(x))) && (!quizCfg.set || c.set.includes(quizCfg.set)));
+}
+function eligible(fmt, range){ if(fmt === 'num') return range; const s = fmt === 'custom' ? customUniq() : UNIQ[fmt]; return range.filter(c => s.has(c.id)); }
+const uniqVals = f => [...new Set(cards.flatMap(f))].filter(Boolean);
+
+/* ===== CSV 読み込み ===== */
+const HEADER_MAP = {id:'id',name:'name','カード名':'name','名前':'name',reading:'reading','読み方':'reading','読み':'reading',type:'type','カードタイプ':'type','タイプ':'type',civ:'civ','文明':'civ',cost:'cost','コスト':'cost',power:'power','パワー':'power',text:'text','カードテキスト':'text','テキスト':'text',rarity:'rarity','レアリティ':'rarity',set:'set','収録弾':'set',flavor:'flavor','フレーバーテキスト':'flavor','フレーバー':'flavor',ft:'flavor',twin_id:'twin_id',aliases:'aliases','別名':'aliases'};
+function toInt(v){ const s = String(v ?? '').normalize('NFKC').replace(/[,\s]/g, ''); if(s === '') return null; if(!/^-?\d+$/.test(s)) return NaN; return parseInt(s, 10); }
+function importRows(rows){
+  const out = [], errs = [], ids = new Set();
+  rows.forEach((raw, i) => {
+    const r = {};
+    for(const k in raw){ const key = HEADER_MAP[k.trim()] || HEADER_MAP[k.trim().toLowerCase()]; if(key) r[key] = raw[k]; }
+    const line = i + 2, problems = [];
+    if(!String(r.name ?? '').trim()) problems.push('カード名が空');
+    if(!String(r.reading ?? '').trim()) problems.push('読み方が空');
+    const cost = toInt(r.cost); if(cost === null || Number.isNaN(cost)) problems.push('コストが数値ではない');
+    const power = toInt(r.power); if(Number.isNaN(power)) problems.push('パワーが数値ではない');
+    let id = String(r.id ?? '').trim(); if(!id) id = 'row' + line;
+    if(ids.has(id)) problems.push(`id「${id}」が重複`);
+    if(problems.length){ errs.push({line, name:String(r.name ?? ''), problems}); return; }
+    ids.add(id); out.push({...r, id, cost, power});
+  });
+  return {out, errs};
+}
+function decode(buf){
+  const u = new TextDecoder('utf-8').decode(buf);
+  if(!u.includes('\uFFFD')) return u.replace(/^\uFEFF/, '');
+  try{ return new TextDecoder('shift_jis').decode(buf); }catch(e){ return u; }
+}
+async function handleFile(file){
+  if(typeof Papa === 'undefined'){ importReport = {fatal:'CSVの読み込み部品を取得できませんでした。通信状況を確認して、ページを開き直してください。'}; render(); return; }
+  const text = decode(await file.arrayBuffer());
+  const parsed = Papa.parse(text, {header:true, skipEmptyLines:'greedy'});
+  const headers = (parsed.meta.fields || []).map(h => HEADER_MAP[h.trim()] || HEADER_MAP[h.trim().toLowerCase()]);
+  if(!headers.includes('name')){ importReport = {fatal:'見出し行に「name」または「カード名」の列が見つかりません。1行目が見出し行になっているか確認してください。'}; render(); return; }
+  const {out, errs} = importRows(parsed.data);
+  importReport = {file:file.name, ok:out.length, errs};
+  if(out.length && host && host.phase !== 'lobby'){ importReport = {fatal:'大会の進行中はカードデータを入れ替えられません。大会が終わってから読み込んでください。'}; render(); return; }
+  if(out.length){
+    cards = out.map(prepCard); dataSource = 'csv'; searchRange = null; session = null; quizView = 'setup';
+    rebuild(); await store.set('cards', out); await store.set('source', 'csv');
+  }
+  render();
+}
+
+/* ===== クイズ ===== */
+const FORMATS = [
+  ['ft','フレーバー当て','フレーバーテキストからカード名'],
+  ['text','テキスト当て','カードテキストからカード名'],
+  ['spec','スペック当て','文明・コスト・パワーからカード名'],
+  ['custom','カスタム','選んだ項目の組み合わせからカード名'],
+  ['num','数値当て','カード名からコストかパワー']
+];
+const FMT_LABEL = Object.fromEntries(FORMATS.map(f => [f[0], f[1]]));
+function saveCfg(){ saveJSON('dmpq-quiz', quizCfg); }
+function setupHTML(){
+  const range = rangeCards();
+  const counts = Object.fromEntries(FORMATS.map(f => [f[0], eligible(f[0], range).length]));
+  const total = new Set(quizCfg.formats.flatMap(f => eligible(f, range).map(c => c.id))).size;
+  const sets = uniqVals(c => c.set);
+  const acc = stats.total ? Math.round(stats.correct / stats.total * 100) : null;
+  return `
+  <section class="block"><h2>どの問題で遊ぶ？</h2><p class="lead">答えが1枚に決まる問題だけを出題します。${acc !== null ? `これまで${stats.total}問、正答率${acc}%。` : ''}</p>
+    <div class="opts">${FORMATS.map(([k, name, desc]) => `
+      <button class="opt ${quizCfg.formats.includes(k) ? 'on' : ''}" data-act="fmt" data-v="${k}" aria-pressed="${quizCfg.formats.includes(k)}">
+        <span><b>${name}</b><small>${desc}</small></span><span class="cnt">${counts[k]}問</span></button>`).join('')}
+    </div>
+    ${quizCfg.formats.includes('custom') ? `<div class="panel" style="margin-top:10px"><h3>カスタムで使う項目</h3>
+      <div class="chips">${Object.entries(FIELD).map(([k, f]) => `<button class="chip ${quizCfg.customFields.includes(k) ? 'on' : ''}" data-act="cfield" data-v="${k}" aria-pressed="${quizCfg.customFields.includes(k)}">${f.label}</button>`).join('')}</div>
+      <p class="note">この組み合わせで答えが1枚に決まるカードは${counts.custom}枚です。</p></div>` : ''}
+  </section>
+  <section class="block"><h3>出題範囲</h3>
+    ${searchRange ? `<div class="banner"><span>検索結果の${searchRange.size}枚から出題します</span><button class="btn ghost" data-act="clear-range">解除</button></div>` : ''}
+    <div class="chips" style="margin-bottom:10px">${CIVS.map(v => `<button class="chip ${quizCfg.civs.includes(v) ? 'on' : ''}" data-act="qciv" data-v="${v}" aria-pressed="${quizCfg.civs.includes(v)}">${pips([v])}${v}</button>`).join('')}</div>
+    <label class="field">収録弾<select data-bind="qset"><option value="">すべて</option>${sets.map(s => `<option ${quizCfg.set === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label>
+    <p class="note">文明を選ばなければ全文明から出題します。</p>
+  </section>
+  <section class="block"><div class="grid2">
+    <div><h3>問題数</h3><div class="seg">${[[10,'10問'],[20,'20問'],[0,'エンドレス']].map(([v, l]) => `<button class="${quizCfg.count === v ? 'on' : ''}" data-act="count" data-v="${v}">${l}</button>`).join('')}</div></div>
+    <div><h3>回答方式</h3><div class="seg">${[['free','自由入力'],['choice','4択']].map(([v, l]) => `<button class="${quizCfg.mode === v ? 'on' : ''}" data-act="mode" data-v="${v}">${l}</button>`).join('')}</div></div>
+  </div></section>
+  <button class="btn primary big" data-act="start" ${total ? '' : 'disabled'}>${total ? `${total}枚の中から出題する` : '出題できる問題がありません'}</button>
+  ${total ? '' : '<p class="note">形式を選ぶか、出題範囲を広げてください。</p>'}`;
+}
+function weightedPick(list){
+  const w = list.map(c => 1 + 2 * ((stats.cards[c.id] || {}).w || 0));
+  let r = Math.random() * w.reduce((a, b) => a + b, 0);
+  for(let i = 0; i < list.length; i++){ r -= w[i]; if(r <= 0) return list[i]; }
+  return list[list.length - 1];
+}
+function startQuiz(){
+  const range = rangeCards(), pools = {};
+  quizCfg.formats.forEach(f => { const e = eligible(f, range); if(e.length) pools[f] = e; });
+  if(!Object.keys(pools).length) return;
+  session = {pools, total:quizCfg.count || Infinity, mode:quizCfg.mode, customFields:[...quizCfg.customFields], idx:0, used:new Set(), log:[], q:null, last:null};
+  nextQuestion();
+}
+function makeChoices(q){
+  if(q.fmt === 'num'){
+    const v = q.card[q.field], steps = q.field === 'cost' ? [1,2,3,-1,-2,-3] : [1000,2000,500,-1000,-2000,-500,3000];
+    const opts = new Set([v]);
+    for(const d of shuffle(steps)){ if(opts.size >= 4) break; const x = v + d; if(x > 0) opts.add(x); }
+    return shuffle([...opts]).map(String);
+  }
+  const ans = q.card, others = cards.filter(c => c._norm !== ans._norm);
+  const near = shuffle(others.filter(c => c.civ.some(x => ans.civ.includes(x)) || c.cost === ans.cost));
+  const names = new Set([ans.name]), picked = [];
+  for(const c of [...near, ...shuffle(others)]){ if(picked.length >= 3) break; if(names.has(c.name)) continue; names.add(c.name); picked.push(c.name); }
+  return shuffle([ans.name, ...picked]);
+}
+function makeQ(pools, used, mode, weighted = true){
+  const fmts = Object.keys(pools), fmt = fmts[Math.floor(Math.random() * fmts.length)];
+  let pool = pools[fmt].filter(c => !used.has(c.id));
+  if(!pool.length) pool = pools[fmt];
+  const card = weighted ? weightedPick(pool) : pool[Math.floor(Math.random() * pool.length)];
+  used.add(card.id);
+  const q = {fmt, card, hint:false};
+  if(fmt === 'num') q.field = (card.power != null && Math.random() < 0.5) ? 'power' : 'cost';
+  if(mode === 'choice') q.choices = makeChoices(q);
+  return q;
+}
+function nextQuestion(){
+  const q = makeQ(session.pools, session.used, session.mode);
+  q.pub = publicQ(q, session.customFields);
+  session.q = q; session.idx++; quizView = 'question'; render();
+}
+function maskName(t, c){
+  // 《》で囲まれた読み込み済みカードの名前（覚醒後・リンク先など）も伏せる。名前の一部だけのものは残す
+  t = t.replace(/《([^《》]*)》/g, (s, x) => NAME_SET.has(norm(x)) ? '《〇〇》' : s);
+  const m = c.name.match(ARTICLE_RE), last = c.name.trim().split(/\s+/).pop();
+  const words = [c.name, ...[m ? c.name.slice(m[0].length) : '', ...c.aliases, last].filter(w => w.length >= 2)].filter(Boolean);
+  return words.sort((a, b) => b.length - a.length).reduce((s, w) => s.split(w).join('〇〇'), t);
+}
+function publicQ(q, customFields){
+  const c = q.card, p = {fmt:q.fmt, field:q.field || null, choices:q.choices || null};
+  if(q.fmt === 'ft') p.flavor = maskName(c.flavor, c);
+  else if(q.fmt === 'text') p.text = maskName(c.text, c);
+  else if(q.fmt === 'spec'){ p.civ = c.civ; p.cost = c.cost; p.power = c.power; }
+  else if(q.fmt === 'custom') p.facts = customFields.map(f => ({label:FIELD[f].label, civ:f === 'civ' ? c.civ : null, value:f === 'civ' ? c.civ.join('/') : f === 'set' ? c.set.join('・') : String(FIELD[f].get(c))}));
+  else if(q.fmt === 'num'){ p.name = c.name; p.civ = c.civ; p.type = c.type; }
+  return p;
+}
+function clueHTML(p){
+  const civ = Array.isArray(p.civ) ? p.civ.map(String) : [];
+  switch(p.fmt){
+    case 'ft': return `<p class="ask">このフレーバーテキストのカードは？</p><blockquote class="ft">${nl(esc(p.flavor))}</blockquote>`;
+    case 'text': return `<p class="ask">このテキストのカードは？</p><div class="cardtext">${nl(esc(p.text))}</div>`;
+    case 'spec': return `<p class="ask">このスペックのカードは？</p><div class="spec">${pips(civ, 'lg')}<div class="spec-num"><span class="k">コスト</span><span class="v">${esc(p.cost)}</span></div><div class="spec-num"><span class="k">パワー</span><span class="v">${esc(p.power)}</span></div></div>`;
+    case 'custom': return `<p class="ask">この条件に当てはまるカードは？</p><dl class="facts">${(Array.isArray(p.facts) ? p.facts : []).map(f => `<dt>${esc(f.label)}</dt><dd>${Array.isArray(f.civ) ? pips(f.civ.map(String)) + ' ' : ''}${esc(f.value)}</dd>`).join('')}</dl>`;
+    case 'num': return `<p class="ask">このカードの${p.field === 'power' ? 'パワー' : 'コスト'}は？</p><p class="qname">${esc(p.name)}</p><p style="margin:0">${pips(civ)} <span style="color:var(--sub);font-size:14px">${esc(p.type)}</span></p>`;
+  }
+  return '';
+}
+function questionHTML(){
+  const q = session.q, finite = session.total !== Infinity;
+  const hintText = q.fmt === 'num' ? '' : `読みは「${esc(chars(q.card.reading).slice(0, 2).join(''))}…」、${esc(q.card.type || 'タイプ不明')}`;
+  const answer = session.mode === 'choice'
+    ? `<div class="choices">${q.choices.map((v, i) => `<button class="btn" data-act="choose" data-i="${i}">${esc(v)}</button>`).join('')}</div>`
+    : `<div class="answerbox"><label for="answer" class="visually-hidden">回答</label><input id="answer" type="${q.fmt === 'num' ? 'text' : 'search'}" ${q.fmt === 'num' ? 'inputmode="numeric"' : ''} autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${q.fmt === 'num' ? '数字で入力' : 'カード名を入力'}"><button class="btn primary" data-act="submit">回答</button></div>`;
+  return `
+  <div class="qbar"><span><b>${finite ? `${session.idx} / ${session.total}` : `${session.idx}問目`}</b>　${FMT_LABEL[q.fmt]}</span><button class="btn ghost" data-act="finish">終了する</button></div>
+  ${finite ? `<div class="progress"><span style="width:${(session.idx - 1) / session.total * 100}%"></span></div>` : ''}
+  <div class="clue">${clueHTML(q.pub)}${q.hint ? `<p class="hint">ヒント：${hintText}</p>` : ''}</div>
+  ${answer}
+  <div class="subacts">${q.fmt !== 'num' && !q.hint ? `<button class="btn ghost" data-act="hint">ヒントを見る（最高評価が○になります）</button>` : '<span></span>'}<button class="btn ghost" data-act="skip">わからない</button></div>`;
+}
+function judgeQ(q, val, mode, hint){
+  val = String(val ?? '');
+  if(q.fmt === 'num'){ const n = toInt(val); return n === q.card[q.field] ? {g:'◎'} : {g:X, msg:val.trim() ? '' : '回答が空でした'}; }
+  if(mode === 'choice') return val === q.card.name ? {g:hint ? '○' : '◎'} : {g:X};
+  return judgeName(val, q.card, hint);
+}
+function submitAnswer(val){
+  const q = session.q, res = judgeQ(q, val, session.mode, q.hint);
+  const ok = res.g === '◎' || res.g === '○';
+  const s = stats.cards[q.card.id] || {r:0, w:0}; ok ? s.r++ : s.w++; stats.cards[q.card.id] = s;
+  stats.total++; if(ok) stats.correct++; saveJSON('dmpq-stats', stats);
+  session.last = {q, input:val, res}; session.log.push(session.last);
+  quizView = 'result'; render();
+}
+function resultHTML(){
+  const {q, input, res} = session.last, c = q.card, G = GRADE[res.g];
+  const isLast = session.idx >= session.total;
+  const correct = q.fmt === 'num' ? `<strong>${esc(c[q.field])}</strong><small>${esc(c.name)}の${q.field === 'cost' ? 'コスト' : 'パワー'}</small>` : `<strong>${esc(c.name)}</strong><small>${esc(c.reading)}</small>`;
+  return `
+  <div class="result">
+    <div class="stamp ${G.cls}" aria-hidden="true">${res.g}</div>
+    <p class="verdict ${G.cls}">${G.label}</p>
+    ${res.msg ? `<p class="msg">${esc(res.msg)}</p>` : ''}
+  </div>
+  <dl class="answer"><dt>あなた</dt><dd>${input.trim() ? esc(input) : '（回答なし）'}</dd><dt>正解</dt><dd>${correct}</dd></dl>
+  <div class="row"><button class="btn primary" data-act="next" id="nextbtn">${isLast ? '結果を見る' : '次の問題'}</button><button class="btn" data-act="detail" data-id="${esc(c.id)}">カードを見る</button></div>`;
+}
+function summaryHTML(){
+  const log = session.log, n = log.length;
+  const cnt = g => log.filter(l => l.res.g === g).length;
+  const ok = cnt('◎') + cnt('○');
+  const missed = [...new Map(log.filter(l => l.res.g === '△' || l.res.g === X).map(l => [l.q.card.id, l.q.card])).values()];
+  return `
+  <h2>おつかれさまでした</h2>
+  <p class="score">${n ? Math.round(ok / n * 100) : 0}<small>%</small></p>
+  <p class="lead" style="margin-bottom:0">${n}問中${ok}問正解（◎と○を正解として数えています）</p>
+  <div class="tally">${['◎','○','△',X].map(g => `<div><span class="s ${GRADE[g].cls}">${g}</span><span class="n">${cnt(g)}</span></div>`).join('')}</div>
+  ${missed.length ? `<h3>復習したいカード</h3><ul class="cardlist" style="margin-bottom:20px">${missed.map(rowHTML).join('')}</ul><p class="note" style="margin-top:-12px;margin-bottom:20px">間違えたカードは、次から出題されやすくなります。</p>` : ''}
+  <div class="row"><button class="btn primary" data-act="again">同じ設定でもう一度</button><button class="btn" data-act="to-setup">設定に戻る</button></div>`;
+}
+
+/* ===== 検索 ===== */
+function searchHTML(){
+  const opt = (arr, v) => `<option value="">すべて</option>${arr.map(x => `<option ${v === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}`;
+  return `
+  <h2>カード検索</h2><p class="lead">条件を入れると、その場で絞り込みます。</p>
+  <div class="panel" style="display:grid;gap:12px">
+    <label class="field">カード名・読み方<input type="search" data-s="name" value="${esc(search.name)}" placeholder="例：ガルド、えんが"></label>
+    <label class="field">テキスト・フレーバー<input type="search" data-s="text" value="${esc(search.text)}" placeholder="例：ブロッカー -呪文"></label>
+    <div><h3>文明</h3><div class="chips">${CIVS.map(v => `<button class="chip ${search.civs.includes(v) ? 'on' : ''}" data-act="sciv" data-v="${v}" aria-pressed="${search.civs.includes(v)}">${pips([v])}${v}</button>`).join('')}</div>
+      <div class="seg" style="margin-top:8px">${[['any','いずれかを含む'],['all','すべてを含む'],['mono','単色のみ']].map(([v, l]) => `<button class="${search.civMode === v ? 'on' : ''}" data-act="scivmode" data-v="${v}">${l}</button>`).join('')}</div></div>
+    <div class="grid2">
+      <label class="field">コスト<span class="rangebox"><input type="number" inputmode="numeric" data-s="cmin" value="${esc(search.cmin)}" placeholder="最小"><span>〜</span><input type="number" inputmode="numeric" data-s="cmax" value="${esc(search.cmax)}" placeholder="最大"></span></label>
+      <label class="field">パワー<span class="rangebox"><input type="number" inputmode="numeric" data-s="pmin" value="${esc(search.pmin)}" placeholder="最小"><span>〜</span><input type="number" inputmode="numeric" data-s="pmax" value="${esc(search.pmax)}" placeholder="最大"></span></label>
+    </div>
+    <div class="grid2">
+      <label class="field">カードタイプ<select data-s="type">${opt(uniqVals(c => [c.type]), search.type)}</select></label>
+      <label class="field">レアリティ<select data-s="rarity">${opt(uniqVals(c => [c.rarity]), search.rarity)}</select></label>
+      <label class="field">収録弾<select data-s="set">${opt(uniqVals(c => c.set), search.set)}</select></label>
+      <label class="field">並び順<select data-s="sort">${[['cost','コスト順'],['power','パワーが高い順'],['name','読み方順'],['set','収録弾順']].map(([v, l]) => `<option value="${v}" ${search.sort === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    </div>
+    <button class="btn ghost" data-act="sreset" style="justify-self:start">条件をクリア</button>
+  </div>
+  <div id="results"></div>`;
+}
+function runSearch(){
+  const qn = norm(search.name);
+  const toks = search.text.normalize('NFKC').split(/\s+/).filter(Boolean);
+  const inc = toks.filter(t => !t.startsWith('-')).map(norm).filter(Boolean);
+  const exc = toks.filter(t => t.startsWith('-') && t.length > 1).map(t => norm(t.slice(1))).filter(Boolean);
+  const num = v => v === '' ? null : Number(v);
+  const cmin = num(search.cmin), cmax = num(search.cmax), pmin = num(search.pmin), pmax = num(search.pmax);
+  let res = cards.filter(c => {
+    if(qn && !c._keys.some(k => k.includes(qn))) return false;
+    if(inc.length || exc.length){
+      const hay = norm(c.text + c.flavor + c.type);
+      if(!inc.every(t => hay.includes(t))) return false;
+      if(exc.some(t => hay.includes(t))) return false;
+    }
+    if(search.civs.length){
+      if(search.civMode === 'any' && !c.civ.some(x => search.civs.includes(x))) return false;
+      if(search.civMode === 'all' && !search.civs.every(x => c.civ.includes(x))) return false;
+      if(search.civMode === 'mono' && !(c.civ.length === 1 && search.civs.includes(c.civ[0]))) return false;
+    }
+    if(cmin !== null && c.cost < cmin) return false;
+    if(cmax !== null && c.cost > cmax) return false;
+    if((pmin !== null || pmax !== null) && c.power == null) return false;
+    if(pmin !== null && c.power < pmin) return false;
+    if(pmax !== null && c.power > pmax) return false;
+    if(search.type && c.type !== search.type) return false;
+    if(search.rarity && c.rarity !== search.rarity) return false;
+    if(search.set && !c.set.includes(search.set)) return false;
+    return true;
+  });
+  const byReading = (a, b) => (a.reading || a.name).localeCompare(b.reading || b.name, 'ja');
+  const sorters = {
+    cost:(a, b) => a.cost - b.cost || byReading(a, b),
+    power:(a, b) => (b.power ?? -1) - (a.power ?? -1) || byReading(a, b),
+    name:byReading,
+    set:(a, b) => (a.set[0] || '').localeCompare(b.set[0] || '', 'ja', {numeric:true}) || a.cost - b.cost
+  };
+  return res.sort(sorters[search.sort] || sorters.cost);
+}
+const rowHTML = c => `<li><button class="cardrow" data-act="detail" data-id="${esc(c.id)}"><span class="costbadge">${esc(c.cost)}</span><span class="nm"><b>${esc(c.name)}</b><small>${esc(c.type)}${c.rarity ? `／${esc(c.rarity)}` : ''}</small></span>${pips(c.civ)}<span class="pw">${esc(c.power)}</span></button></li>`;
+let lastResults = [];
+function updateResults(){
+  const box = $('#results'); if(!box) return;
+  lastResults = runSearch();
+  const shown = lastResults.slice(0, search.limit);
+  box.innerHTML = `
+    <div class="reshead"><b>${lastResults.length}枚</b>${lastResults.length ? `<button class="btn" data-act="search-to-quiz">この${lastResults.length}枚で出題</button>` : ''}</div>
+    ${lastResults.length ? `<ul class="cardlist">${shown.map(rowHTML).join('')}</ul>${lastResults.length > shown.length ? `<button class="btn" style="width:100%;margin-top:10px" data-act="more">さらに表示（残り${lastResults.length - shown.length}枚）</button>` : ''}` : '<div class="empty">条件に合うカードはありません。条件を減らしてみてください。</div>'}`;
+}
+
+/* ===== カード詳細 ===== */
+function openDetail(id){
+  const c = byId.get(id); if(!c) return;
+  const s = stats.cards[c.id] || {r:0, w:0};
+  const twin = c.twin_id && byId.get(c.twin_id);
+  $('#sheet-body').innerHTML = `
+    <button class="btn close" data-act="close">閉じる</button>
+    <h2>${esc(c.name)}</h2><p class="reading">${esc(c.reading)}</p>
+    <p>${pips(c.civ)} ${esc(c.civ.join('/'))}　<span style="color:var(--sub)">${esc(c.type)}</span></p>
+    <div class="statsgrid"><div><span class="k">コスト</span><span class="v">${esc(c.cost)}</span></div><div><span class="k">パワー</span><span class="v">${esc(c.power ?? '—')}</span></div><div><span class="k">レアリティ</span><span class="v">${esc(c.rarity) || '—'}</span></div><div><span class="k">収録弾</span><span class="v">${esc(c.set.join('・')) || '—'}</span></div></div>
+    ${c.text ? `<div class="textbox">${nl(esc(c.text))}</div>` : ''}
+    ${c.flavor ? `<div class="textbox ft">${nl(esc(c.flavor))}</div>` : ''}
+    ${twin ? `<p><button class="btn" data-act="detail" data-id="${esc(twin.id)}">もう片面「${esc(twin.name)}」を見る</button></p>` : ''}
+    ${c.aliases.length ? `<p class="note">別名：${esc(c.aliases.join('、'))}</p>` : ''}
+    <p class="note">クイズの成績：正解${s.r}回、ミス${s.w}回</p>`;
+  $('#sheet').hidden = false;
+  $('#sheet-body').scrollTop = 0;
+  $('#sheet .close').focus({preventScroll:true});
+}
+function closeDetail(){ $('#sheet').hidden = true; }
+
+/* ===== データ画面 ===== */
+const TEMPLATE = 'id,name,reading,type,civ,cost,power,text,rarity,set,flavor,twin_id,aliases\nX-001,炎の剣士,ほのおのけんし,クリーチャー,火,5,6000,"■スピードアタッカー\\n■W・ブレイカー",VR,第1弾,炎は消えない。,,';
+function dataHTML(){
+  const acc = stats.total ? Math.round(stats.correct / stats.total * 100) : 0;
+  const rep = importReport;
+  return `
+  <h2>データと設定</h2><p class="lead">カードデータはこの端末のブラウザにだけ保存されます。</p>
+  <section class="block panel">
+    <h3>カードデータ</h3>
+    <p>いまは<b>${cards.length}枚</b>（${own(SOURCE_LABEL, dataSource) || SOURCE_LABEL.sample}）です。</p>
+    <div class="row"><label class="btn primary" style="cursor:pointer">CSVを読み込む<input type="file" id="csvfile" accept=".csv,.tsv,.txt,text/csv" class="visually-hidden"></label>${dataSource === 'csv' ? '<button class="btn" data-act="reset-data">読み込んだCSVを消す</button>' : ''}</div>
+    ${rep ? (rep.fatal ? `<p class="ng" style="margin-top:12px">${esc(rep.fatal)}</p>` : `
+      <p style="margin-top:12px">「${esc(rep.file)}」から<span class="ok">${rep.ok}枚</span>を取り込みました。${rep.errs.length ? `<span class="ng">${rep.errs.length}行</span>は取り込めませんでした。` : ''}${rep.ok ? '' : 'いまのデータはそのままです。'}</p>
+      ${rep.errs.length ? `<ul class="errlist">${rep.errs.slice(0, 100).map(e => `<li>${e.line}行目 ${esc(e.name)}：${esc(e.problems.join('、'))}</li>`).join('')}</ul>` : ''}`) : ''}
+  </section>
+  <section class="block panel">
+    <h3>CSVの形式</h3>
+    <p style="font-size:14px">1行目を見出し行にして、UTF-8で保存してください。見出しは英語名でも「カード名」「読み方」のような日本語でも読めます。多色や再録は「/」で区切り、テキストの改行は「\\n」と書きます。必須はカード名・読み方・コストです。</p>
+    <pre class="tpl">${esc(TEMPLATE)}</pre>
+    <button class="btn" data-act="copy-tpl">見出し行と記入例をコピー</button>
+  </section>
+  <section class="block panel">
+    <h3>正誤判定の基準</h3>
+    ${[['th2','△になる一致度','2文字以上違っても、この値以上なら惜しい',100],['th3','候補を出す一致度','正解との一致度がこの値未満なら、候補を出さずに不正解（1文字違いの○や、別カードとの完全一致はこの値に関係なく判定）',100],['margin','候補の差','2文字以上違う答えで、別カードとの差がこれ未満なら△（△の基準未満なら不正解）',100]].map(([k, l, d, m]) => `
+      <label class="setrow"><span>${l}<small>${d}（%）</small></span><input type="number" min="0" max="100" step="5" data-set="${k}" value="${Math.round(settings[k] * m)}"></label>`).join('')}
+    <label class="check"><input type="checkbox" data-set="article" ${settings.article ? 'checked' : ''}>先頭の「ザ・」「The」を省いても正解にする</label>
+  </section>
+  <section class="block panel">
+    <h3>成績</h3>
+    <p>これまで${stats.total}問、正答率${acc}%です。</p>
+    <button class="btn" data-act="reset-stats">成績をリセット</button>
+  </section>`;
+}
+
+
+/* ===== クイズ大会（PeerJS による端末間通信） ===== */
+const PEER_PREFIX = 'dmpq-party-v1-';
+const BASE_PTS = {'◎':100, '○':70, '△':30, [X]:0};
+let partyCfg = loadJSON('dmpq-party', {count:10, time:30, mode:'free', bonus:true});
+let host = null, player = null, partyError = '';
+const params = new URLSearchParams(location.search);
+const roomParam = (params.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+const playerMode = !!roomParam;
+function getPid(){ let p = ''; try{ p = localStorage.getItem('dmpq-pid') || ''; }catch(e){} if(!p){ p = Math.random().toString(36).slice(2) + Date.now().toString(36); try{ localStorage.setItem('dmpq-pid', p); }catch(e){} } return p; }
+function savedName(){ try{ return localStorage.getItem('dmpq-name') || ''; }catch(e){ return ''; } }
+function genCode(){ const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c = ''; for(let i = 0; i < 5; i++) c += a[Math.floor(Math.random() * a.length)]; return c; }
+function joinURL(code){ return location.origin + location.pathname + '?room=' + code; }
+function peerErrText(err){
+  const t = err && err.type;
+  if(t === 'peer-unavailable') return '部屋が見つかりません。コードが合っているか、主催者が部屋を開いたままか確認してください。';
+  if(t === 'network' || t === 'server-error' || t === 'socket-error' || t === 'socket-closed') return '接続用のサーバーにつながりません。ネットワークを確認してください。';
+  if(t === 'browser-incompatible') return 'このブラウザは端末間の通信に対応していません。別のブラウザで開いてください。';
+  return `接続できませんでした（${t || '不明なエラー'}）。会社などのネットワークでは、端末同士の直接接続がブロックされることがあります。`;
+}
+function waitingHTML(t){ return `<div class="waiting">${t}</div>`; }
+function rankRows(list){
+  const sorted = [...list].sort((a, b) => b.score - a.score);
+  let prev = null, rank = 0;
+  return sorted.map((r, i) => { if(r.score !== prev){ rank = i + 1; prev = r.score; } return {...r, rank}; });
+}
+function boardHTML(rows, limit = 30){
+  return `<ol class="board">${rows.slice(0, limit).map(r => `<li class="${r.me ? 'me' : ''} ${r.online === false ? 'off' : ''}"><span class="rk">${esc(r.rank)}</span><span>${esc(r.name)}${r.me ? '（あなた）' : ''}</span><span class="sc">${esc(r.score)}点</span></li>`).join('')}</ol>`;
+}
+function timerHTML(id){ return `<div class="timer" id="${id}"><span class="tnum">--</span><span class="tbar"><span style="width:100%"></span></span></div>`; }
+function updTimer(sel, rem, dur){
+  const el = $(sel); if(!el) return;
+  el.querySelector('.tnum').textContent = Math.max(0, Math.ceil(rem / 1000));
+  el.querySelector('.tbar span').style.width = Math.max(0, Math.min(100, rem / dur * 100)) + '%';
+}
+
+/* --- 主催者 --- */
+function partyPools(){
+  const range = rangeCards(), pools = {};
+  quizCfg.formats.forEach(f => { const e = eligible(f, range); if(e.length) pools[f] = e; });
+  return pools;
+}
+function createRoom(){
+  partyError = '';
+  if(typeof Peer === 'undefined'){ partyError = '通信用の部品を読み込めませんでした。ネットワークを確認して、ページを開き直してください。'; render(); return; }
+  const code = genCode();
+  const peer = new Peer(PEER_PREFIX + code, {debug:0});
+  host = {peer, code, players:new Map(), phase:'opening', cfg:{...partyCfg}, idx:0, total:partyCfg.count, used:new Set(), q:null, pub:null, answers:new Map(), results:null, startedAt:0, endsAt:0};
+  const me = host;
+  peer.on('open', () => { if(host !== me) return; host.phase = 'lobby'; render(); });
+  peer.on('error', err => {
+    if(host !== me) return;
+    if(err.type === 'unavailable-id' && host.phase === 'opening'){ peer.destroy(); host = null; createRoom(); return; }
+    if(err.type === 'peer-unavailable') return;
+    partyError = peerErrText(err);
+    if(host.phase === 'opening'){ peer.destroy(); host = null; }
+    render();
+  });
+  peer.on('disconnected', () => { if(host === me && !peer.destroyed){ try{ peer.reconnect(); }catch(e){} } });
+  peer.on('connection', conn => {
+    conn.on('data', m => { if(host === me) hostOnData(conn, m); });
+    conn.on('close', () => { if(host === me) hostOnClose(conn); });
+    conn.on('error', () => { if(host === me) hostOnClose(conn); });
+  });
+  render();
+}
+function hostOnData(conn, m){
+  /* 接続ごとの受信数制限：1秒に10件を超えたら捨て、50件を超えたら切断する */
+  const now = Date.now();
+  if(!conn._rt || now - conn._rt >= 1000){ conn._rt = now; conn._rn = 0; }
+  if(++conn._rn > 50){ try{ conn.close(); }catch(e){} return; }
+  if(conn._rn > 10) return;
+  if(!m || typeof m !== 'object') return;
+  if(m.t === 'join'){
+    const pid = String(m.pid || '').slice(0, 40); if(!pid) return;
+    if(conn._pid && conn._pid !== pid) return;
+    const name = (typeof m.name === 'string' ? m.name : '').trim().slice(0, 16) || '名無し';
+    let p = host.players.get(pid);
+    if(!p){
+      if(host.players.size >= 30){ try{ conn.send({t:'error', msg:'満員のため参加できません（最大30人）。'}); }catch(e){} return; }
+      p = {pid, name, score:0}; host.players.set(pid, p);
+    }
+    if(p.conn && p.conn !== conn){ try{ p.conn.close(); }catch(e){} }
+    p.name = name; p.conn = conn; p.online = true; conn._pid = pid;
+    hostSyncSoon();
+  } else if(m.t === 'answer'){
+    const p = host.players.get(conn._pid);
+    if(!p || host.phase !== 'question' || m.idx !== host.idx || host.answers.has(p.pid)) return;
+    host.answers.set(p.pid, {text:typeof m.text === 'string' ? m.text.slice(0, MAX_ANSWER) : '', ms:Date.now() - host.startedAt});
+    const online = [...host.players.values()].filter(x => x.online);
+    if(online.length && online.every(x => host.answers.has(x.pid))) closeQuestion();
+    else hostSyncSoon();
+  }
+}
+function hostOnClose(conn){
+  const p = host.players.get(conn._pid);
+  if(p && p.conn === conn){ p.online = false; hostSyncSoon(); }
+}
+function hostRanking(){ return rankRows([...host.players.values()].map(p => ({pid:p.pid, name:p.name, score:p.score, online:!!p.online}))); }
+function stateFor(p, rk){
+  const s = {
+    t:'state', phase:host.phase, idx:host.idx, total:host.total, mode:host.cfg.mode, time:host.cfg.time,
+    remain:host.phase === 'question' ? Math.max(0, host.endsAt - Date.now()) : 0,
+    q:(host.phase === 'question' || host.phase === 'reveal') ? host.pub : null,
+    answered:host.answers.size, online:[...host.players.values()].filter(x => x.online).length,
+    board:rk.map(r => ({name:r.name, score:r.score, rank:r.rank, online:r.online, me:r.pid === p.pid})),
+    me:{name:p.name, score:p.score, rank:(rk.find(r => r.pid === p.pid) || {}).rank || '-', answered:host.answers.has(p.pid), answerText:(host.answers.get(p.pid) || {}).text || ''}
+  };
+  if(host.phase === 'reveal'){
+    const c = host.q.card, num = host.q.fmt === 'num';
+    s.reveal = {
+      answer:num ? String(c[host.q.field]) : c.name,
+      sub:num ? `${c.name}の${host.q.field === 'cost' ? 'コスト' : 'パワー'}` : c.reading,
+      mine:host.results.find(r => r.pid === p.pid) || null,
+      top:host.results.slice(0, 5).map(r => ({name:r.name, g:r.g, pts:r.pts, input:r.input}))
+    };
+    if(s.reveal.mine) s.reveal.mine = {g:s.reveal.mine.g, pts:s.reveal.mine.pts, input:s.reveal.mine.input, msg:s.reveal.mine.msg || ''};
+  }
+  return s;
+}
+/* 参加者からの join・answer・切断による同期は 100ms ごとにまとめる。主催者の操作は hostSync で即時に送る */
+let syncTimer = 0;
+function hostSyncSoon(){ if(!syncTimer) syncTimer = setTimeout(() => { syncTimer = 0; hostSync(); }, 100); }
+function hostSync(){
+  clearTimeout(syncTimer); syncTimer = 0;
+  if(!host) return;
+  const rk = hostRanking();
+  for(const p of host.players.values()){
+    if(p.online && p.conn && p.conn.open){ try{ p.conn.send(stateFor(p, rk)); }catch(e){} }
+  }
+  if(tab === 'party') render();
+}
+function hostStart(){
+  const pools = partyPools();
+  if(!Object.keys(pools).length){ partyError = '出題できる問題がありません。クイズタブで形式や範囲を見直してください。'; render(); return; }
+  host.pools = pools; host.used = new Set(); host.idx = 0; host.total = host.cfg.count;
+  for(const p of host.players.values()) p.score = 0;
+  hostNextQ();
+}
+function hostNextQ(){
+  host.idx++;
+  const q = makeQ(host.pools, host.used, host.cfg.mode, false);
+  host.q = q; host.pub = publicQ(q, quizCfg.customFields);
+  host.answers = new Map(); host.results = null;
+  host.startedAt = Date.now(); host.endsAt = host.startedAt + host.cfg.time * 1000;
+  host.phase = 'question'; hostSync();
+}
+function closeQuestion(){
+  if(!host || host.phase !== 'question') return;
+  const q = host.q, dur = host.cfg.time * 1000;
+  host.results = [...host.players.values()].filter(p => p.online || host.answers.has(p.pid)).map(p => {
+    const a = host.answers.get(p.pid);
+    if(!a) return {pid:p.pid, name:p.name, input:'', g:X, pts:0, ms:Infinity, msg:'時間切れ'};
+    const res = judgeQ(q, a.text, host.cfg.mode, false);
+    let pts = BASE_PTS[res.g];
+    if(host.cfg.bonus && (res.g === '◎' || res.g === '○')) pts += Math.round(50 * Math.max(0, 1 - a.ms / dur));
+    p.score += pts;
+    return {pid:p.pid, name:p.name, input:a.text, g:res.g, pts, ms:a.ms, msg:res.msg || ''};
+  }).sort((a, b) => b.pts - a.pts || a.ms - b.ms);
+  host.phase = 'reveal'; hostSync();
+}
+function hostNext(){ if(host.idx >= host.total){ host.phase = 'final'; hostSync(); } else hostNextQ(); }
+function closeRoom(){
+  if(!host) return;
+  for(const p of host.players.values()){ if(p.conn && p.conn.open){ try{ p.conn.send({t:'closed'}); }catch(e){} } }
+  const peer = host.peer; host = null;
+  setTimeout(() => { try{ peer.destroy(); }catch(e){} }, 300);
+  render();
+}
+function hostHTML(){
+  const h = host;
+  if(h.phase === 'opening') return waitingHTML('部屋を準備しています…');
+  const players = [...h.players.values()], online = players.filter(p => p.online);
+  const head = `<div class="qbar"><span>部屋コード <b>${h.code}</b>　参加 ${online.length}人</span><button class="btn ghost" data-act="host-close">部屋を閉じる</button></div>`;
+  if(h.phase === 'lobby') return `
+    ${partyError ? `<p class="ng">${esc(partyError)}</p>` : ''}
+    <div style="text-align:center">
+      <p class="lead" style="margin-bottom:0">この部屋コードを参加者に伝えてください</p>
+      <p class="bigcode">${h.code}</p>
+      <div class="qrbox" id="qr" aria-label="参加用のQRコード"></div>
+      <p class="joinurl">${esc(joinURL(h.code))}</p>
+      ${location.protocol === 'file:' ? '<p class="note ng">ファイルを直接開いているため、このURLは参加者には使えません。参加者には同じファイルを開いて、大会タブからコードを入力してもらってください。</p>' : ''}
+      <p><button class="btn" data-act="copy-url">参加URLをコピー</button></p>
+    </div>
+    <h3>参加者 ${online.length}人</h3>
+    <div class="plist">${players.length ? players.map(p => `<span class="pchip ${p.online ? '' : 'off'}">${esc(p.name)}</span>`).join('') : '<span class="note">まだ誰も参加していません</span>'}</div>
+    <details class="panel" style="margin-bottom:16px"><summary style="cursor:pointer;font-weight:700">大会の設定（${h.cfg.count}問・1問${h.cfg.time}秒・${h.cfg.mode === 'choice' ? '4択' : '自由入力'}）</summary><div style="margin-top:12px">${partyCfgHTML(h.cfg)}</div></details>
+    <button class="btn primary big" data-act="host-start" ${online.length ? '' : 'disabled'}>${online.length ? `${online.length}人で開始する` : '参加者を待っています'}</button>`;
+  if(h.phase === 'question') return `${head}
+    <div class="qbar"><span><b>第${h.idx}問 / ${h.total}</b>　${FMT_LABEL[h.q.fmt]}</span><span>回答 <b>${h.answers.size}</b> / ${online.length}</span></div>
+    ${timerHTML('h-timer')}
+    <div class="clue big">${clueHTML(h.pub)}${h.cfg.mode === 'choice' ? `<ol style="margin:14px 0 0;padding-left:1.4em;font-size:18px">${h.pub.choices.map(c => `<li>${esc(c)}</li>`).join('')}</ol>` : ''}</div>
+    <div class="plist">${online.map(p => `<span class="pchip ${h.answers.has(p.pid) ? 'done' : ''}">${esc(p.name)}${h.answers.has(p.pid) ? ' ✓' : ''}</span>`).join('')}</div>
+    <button class="btn big" data-act="host-close-q">締め切る</button>`;
+  if(h.phase === 'reveal'){
+    const c = h.q.card, num = h.q.fmt === 'num';
+    return `${head}
+    <div class="qbar"><span><b>第${h.idx}問 / ${h.total}</b>　${FMT_LABEL[h.q.fmt]}</span></div>
+    <div class="correct-big"><div class="k">正解</div><div class="v">${esc(num ? c[h.q.field] : c.name)}</div><small>${esc(num ? `${c.name}の${h.q.field === 'cost' ? 'コスト' : 'パワー'}` : c.reading)}</small></div>
+    <h3>この問題の結果</h3>
+    <ul class="reslist">${h.results.length ? h.results.map(r => `<li><span class="rg ${GRADE[r.g].cls}">${r.g}</span><span>${esc(r.name)}<small>${r.input ? esc(r.input) : esc(r.msg || '回答なし')}</small></span><span class="rp">+${r.pts}</span></li>`).join('') : '<li><span></span><span>回答者がいません</span><span></span></li>'}</ul>
+    <h3>現在の順位</h3>${boardHTML(hostRanking(), 10)}
+    <div class="row"><button class="btn primary big" data-act="host-next">${h.idx >= h.total ? '最終結果を見る' : '次の問題'}</button><button class="btn" data-act="detail" data-id="${esc(c.id)}">カードを見る</button></div>`;
+  }
+  const rk = hostRanking();
+  return `${head}
+    <h2>最終結果</h2>
+    ${rk.length ? `<div class="correct-big"><div class="k">優勝</div><div class="v">${esc(rk.filter(r => r.rank === 1).map(r => r.name).join('、'))}</div><small>${rk[0].score}点</small></div>` : ''}
+    ${boardHTML(rk)}
+    <div class="row"><button class="btn primary" data-act="host-start">同じメンバーでもう一度</button><button class="btn" data-act="host-back">ロビーに戻る</button></div>`;
+}
+
+/* --- 参加者 --- */
+function joinRoom(code, name){
+  code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+  name = String(name || '').trim().slice(0, 16);
+  if(code.length !== 5 || !name){ partyError = '部屋コード（5文字）と表示名を入力してください。'; render(); return; }
+  partyError = '';
+  try{ localStorage.setItem('dmpq-name', name); }catch(e){}
+  if(player && player.peer){ try{ player.peer.destroy(); }catch(e){} }
+  player = {code, name, pid:getPid(), status:'connecting', state:null, err:'', lastKey:'', deadline:0};
+  const me = player;
+  render();
+  if(typeof Peer === 'undefined'){ player.status = 'error'; player.err = '通信用の部品を読み込めませんでした。ネットワークを確認して、ページを開き直してください。'; render(); return; }
+  const peer = new Peer({debug:0}); player.peer = peer;
+  const fail = msg => { if(player !== me || me.status === 'ended') return; me.status = 'error'; me.err = msg; render(); };
+  setTimeout(() => { if(player === me && me.status === 'connecting') fail('時間内につながりませんでした。コードを確認して、もう一度試してください。'); }, 15000);
+  peer.on('open', () => {
+    if(player !== me) return;
+    const conn = peer.connect(PEER_PREFIX + code, {reliable:true});
+    me.conn = conn;
+    conn.on('open', () => { if(player !== me) return; conn.send({t:'join', pid:me.pid, name:me.name}); me.status = 'joined'; render(); });
+    conn.on('data', m => { if(player === me) playerOnData(m); });
+    conn.on('close', () => { if(player === me && me.conn === conn && me.status !== 'ended'){ me.status = 'closed'; render(); } });
+  });
+  peer.on('error', err => fail(peerErrText(err)));
+}
+/* 主催者から届く状態は信用せず、使う項目だけを型と長さをそろえて取り出す */
+const PHASES = ['lobby', 'question', 'reveal', 'final'];
+const isObj = v => !!v && typeof v === 'object';
+const rankOf = v => Number.isFinite(v) ? v : '-';
+function cleanQ(q){
+  if(!isObj(q)) return null;
+  const civ = a => Array.isArray(a) ? a.slice(0, 8).map(v => str(v, 20)) : [];
+  return {
+    fmt:str(q.fmt, 10), field:q.field === 'power' || q.field === 'cost' ? q.field : null,
+    choices:Array.isArray(q.choices) ? q.choices.slice(0, 10).map(v => str(v, 200)) : null,
+    flavor:str(q.flavor, 1000), text:str(q.text, 2000), civ:civ(q.civ), cost:str(q.cost, 10), power:str(q.power, 10),
+    facts:Array.isArray(q.facts) ? q.facts.slice(0, 10).filter(isObj).map(f => ({label:str(f.label, 20), civ:Array.isArray(f.civ) ? civ(f.civ) : null, value:str(f.value, 200)})) : [],
+    name:str(q.name, 200), type:str(q.type, 50)
+  };
+}
+function cleanState(m){
+  if(!PHASES.includes(m.phase)) return null;
+  const me = isObj(m.me) ? m.me : {}, r = isObj(m.reveal) ? m.reveal : null, mine = r && isObj(r.mine) ? r.mine : null;
+  const time = Math.min(Math.max(0, fin(m.time)), 600);
+  return {
+    t:'state', phase:m.phase, idx:fin(m.idx), total:fin(m.total), mode:m.mode === 'choice' ? 'choice' : 'free', time,
+    remain:Math.min(Math.max(0, fin(m.remain)), time * 1000), q:cleanQ(m.q), answered:fin(m.answered), online:fin(m.online),
+    board:Array.isArray(m.board) ? m.board.slice(0, 30).filter(isObj).map(x => ({name:str(x.name, 16), score:fin(x.score), rank:rankOf(x.rank), online:x.online === true, me:x.me === true})) : [],
+    me:{name:str(me.name, 16), score:fin(me.score), rank:rankOf(me.rank), answered:me.answered === true, answerText:str(me.answerText, MAX_ANSWER)},
+    reveal:r ? {answer:str(r.answer, 200), sub:str(r.sub, 200), mine:mine ? {g:str(mine.g, 4), pts:fin(mine.pts), input:str(mine.input, MAX_ANSWER), msg:str(mine.msg, 200)} : null} : null
+  };
+}
+function playerOnData(m){
+  if(!m || typeof m !== 'object') return;
+  if(m.t === 'closed'){ player.status = 'ended'; render(); return; }
+  if(m.t === 'error'){ player.status = 'error'; player.err = str(m.msg, 200) || 'エラーが起きました'; render(); return; }
+  if(m.t !== 'state') return;
+  m = cleanState(m); if(!m) return;
+  player.state = m;
+  if(m.phase === 'question') player.deadline = Date.now() + Number(m.remain || 0);
+  const key = `${player.status}|${m.phase}|${m.idx}|${m.me && m.me.answered}`;
+  if(tab !== 'party') return;
+  if(key === player.lastKey && $('#p-live')){ $('#p-live').innerHTML = playerLiveHTML(); return; }
+  render();
+}
+function leaveRoom(){ if(player && player.peer){ try{ player.peer.destroy(); }catch(e){} } player = null; render(); }
+function playerLiveHTML(){
+  const s = player.state;
+  if(s.phase === 'lobby') return `<h3>参加者 ${esc(s.online)}人</h3><div class="plist">${s.board.map(r => `<span class="pchip ${r.online ? '' : 'off'}">${esc(r.name)}</span>`).join('')}</div>`;
+  if(s.phase === 'question') return `回答 ${esc(s.answered)} / ${esc(s.online)}人`;
+  return '';
+}
+function playerHTML(){
+  const P = player;
+  const leave = `<button class="btn ghost" data-act="leave">退出する</button>`;
+  if(P.status === 'connecting') return waitingHTML(`部屋「${esc(P.code)}」につないでいます…`);
+  if(P.status === 'error') return `<p class="ng">${esc(P.err)}</p><div class="row"><button class="btn primary" data-act="rejoin">もう一度つなぐ</button>${leave}</div>`;
+  if(P.status === 'closed') return `${waitingHTML('主催者との接続が切れました。点数は主催者側に残っているので、つなぎ直せば続きから参加できます。')}<div class="row"><button class="btn primary" data-act="rejoin">つなぎ直す</button>${leave}</div>`;
+  if(P.status === 'ended') return `${waitingHTML('主催者が部屋を閉じました。おつかれさまでした！')}${P.state && P.state.board ? boardHTML(P.state.board) : ''}${leave}`;
+  const s = P.state;
+  if(!s) return waitingHTML('主催者からの応答を待っています…');
+  const top = `<div class="qbar"><span><b>${esc(s.me.name)}</b>　${esc(s.me.score)}点・${esc(s.me.rank)}位</span>${leave}</div>`;
+  if(s.phase === 'lobby') return `${top}${waitingHTML('参加しました。主催者が始めるのを待っています。')}<div id="p-live">${playerLiveHTML()}</div>`;
+  if(s.phase === 'question'){
+    const q = s.q || {};
+    const isNum = q.fmt === 'num';
+    const answer = s.me.answered
+      ? waitingHTML(`回答しました：「${esc(s.me.answerText) || '（空欄）'}」<br>締め切りを待っています`)
+      : s.mode === 'choice' && Array.isArray(q.choices)
+        ? `<div class="choices">${q.choices.map((v, i) => `<button class="btn" data-act="p-choose" data-i="${i}">${esc(v)}</button>`).join('')}</div>`
+        : `<div class="answerbox"><label for="p-answer" class="visually-hidden">回答</label><input id="p-answer" type="${isNum ? 'text' : 'search'}" ${isNum ? 'inputmode="numeric"' : ''} autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${isNum ? '数字で入力' : 'カード名を入力'}"><button class="btn primary" data-act="p-submit">回答</button></div>`;
+    return `${top}<div class="qbar"><span><b>第${esc(s.idx)}問 / ${esc(s.total)}</b>　${esc(own(FMT_LABEL, q.fmt) || '')}</span><span id="p-live">${playerLiveHTML()}</span></div>${timerHTML('p-timer')}<div class="clue">${clueHTML(q)}</div>${answer}`;
+  }
+  if(s.phase === 'reveal'){
+    const r = s.reveal || {}, mine = r.mine, G = mine ? own(GRADE, mine.g) || GRADE[X] : null;
+    return `${top}
+      ${mine ? `<div class="result"><div class="stamp ${G.cls}" aria-hidden="true">${esc(mine.g)}</div><p class="verdict ${G.cls}">${G.label}</p><p class="pts">+${esc(mine.pts)}点</p>${mine.msg ? `<p class="msg">${esc(mine.msg)}</p>` : ''}</div>` : waitingHTML('この問題には参加していません')}
+      <div class="correct-big"><div class="k">正解</div><div class="v">${esc(r.answer)}</div><small>${esc(r.sub)}</small></div>
+      ${mine && mine.input ? `<p class="note" style="text-align:center">あなたの回答：${esc(mine.input)}</p>` : ''}
+      <h3>現在の順位</h3>${boardHTML(s.board, 10)}
+      ${waitingHTML('次の問題を待っています')}`;
+  }
+  const meRow = s.board.find(r => r.me);
+  return `${top}<h2>最終結果</h2>${meRow ? `<div class="correct-big"><div class="k">あなたの順位</div><div class="v">${esc(meRow.rank)}位</div><small>${esc(meRow.score)}点</small></div>` : ''}${boardHTML(s.board)}${waitingHTML('主催者が次の大会を始めると、ここに出題されます')}`;
+}
+function playerSubmit(text){
+  const P = player; if(!P || !P.conn || !P.conn.open || !P.state || P.state.phase !== 'question') return;
+  try{ P.conn.send({t:'answer', idx:P.state.idx, text:String(text).slice(0, MAX_ANSWER)}); }catch(e){}
+  P.state.me.answered = true; P.state.me.answerText = String(text).slice(0, MAX_ANSWER); render();
+}
+
+/* --- 大会タブの入口 --- */
+function partyCfgHTML(cfg){
+  const seg = (k, items) => `<div class="seg">${items.map(([v, l]) => `<button class="${cfg[k] === v ? 'on' : ''}" data-act="pcfg" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
+  return `<div class="grid2" style="margin-bottom:12px">
+      <div><h3>問題数</h3>${seg('count', [[5,'5問'],[10,'10問'],[20,'20問']])}</div>
+      <div><h3>制限時間</h3>${seg('time', [[15,'15秒'],[30,'30秒'],[60,'60秒']])}</div>
+      <div><h3>回答方式</h3>${seg('mode', [['free','自由入力'],['choice','4択']])}</div>
+    </div>
+    <label class="check"><input type="checkbox" data-pbonus ${cfg.bonus ? 'checked' : ''}>早押しボーナス（速く正解するほど最大50点加算）</label>
+    <p class="note">配点：◎100点、○70点、△30点、✖︎0点。</p>`;
+}
+function partySetupHTML(){
+  const range = rangeCards();
+  const total = new Set(quizCfg.formats.flatMap(f => eligible(f, range).map(c => c.id))).size;
+  const fmtNames = quizCfg.formats.map(f => FMT_LABEL[f]).join('、') || '未選択';
+  const rangeText = searchRange ? `検索結果の${searchRange.size}枚` : [quizCfg.civs.length ? quizCfg.civs.join('・') : '全文明', quizCfg.set || '全収録弾'].join('、');
+  const join = `<section class="block panel"><h3>部屋に参加する</h3>
+      <div class="grid2"><label class="field">部屋コード<input type="text" id="j-code" maxlength="5" autocapitalize="characters" autocomplete="off" value="${esc(roomParam)}" placeholder="例：K7PQ2"></label><label class="field">表示名<input type="text" id="j-name" maxlength="16" autocomplete="nickname" value="${esc(savedName())}" placeholder="例：たろう"></label></div>
+      <button class="btn primary" data-act="join" style="margin-top:12px;width:100%">参加する</button></section>`;
+  if(playerMode) return `<h2>クイズ大会に参加</h2><p class="lead">表示名を入れて参加してください。ほかの参加者にも表示されます。</p>${partyError ? `<p class="ng">${esc(partyError)}</p>` : ''}${join}`;
+  return `
+  <h2>クイズ大会</h2><p class="lead">主催者が部屋を作り、参加者は自分のスマホから回答します。参加者にアカウントやカードデータは要りません。</p>
+  ${partyError ? `<p class="ng">${esc(partyError)}</p>` : ''}
+  <section class="block panel"><h3>部屋を作る（主催者）</h3>
+    <p style="font-size:14px">出題形式：${esc(fmtNames)}<br>出題範囲：${esc(rangeText)}（${total}枚）　<button class="btn ghost" data-act="goto-quiz" style="min-height:32px">クイズタブで変更</button></p>
+    ${partyCfgHTML(partyCfg)}
+    <button class="btn primary big" data-act="host-create" ${total ? '' : 'disabled'}>部屋を作る</button>
+  </section>
+  ${join}`;
+}
+function partyHTML(){ if(host) return hostHTML(); if(player) return playerHTML(); return partySetupHTML(); }
+function afterPartyRender(){
+  if(host && host.phase === 'lobby'){
+    const el = $('#qr');
+    if(el && typeof QRCode !== 'undefined'){ try{ new QRCode(el, {text:joinURL(host.code), width:180, height:180, colorDark:'#000000', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M}); }catch(e){} }
+    else if(el) el.style.display = 'none';
+  }
+  if(player && player.state){
+    const s = player.state;
+    player.lastKey = `${player.status}|${s.phase}|${s.idx}|${s.me && s.me.answered}`;
+    const i = $('#p-answer'); if(i) i.focus({preventScroll:true});
+  } else if(player) player.lastKey = '';
+}
+setInterval(() => {
+  if(host && host.phase === 'question'){
+    const rem = host.endsAt - Date.now();
+    updTimer('#h-timer', rem, host.cfg.time * 1000);
+    if(rem <= 0) closeQuestion();
+  }
+  if(player && player.state && player.state.phase === 'question') updTimer('#p-timer', player.deadline - Date.now(), player.state.time * 1000);
+}, 200);
+window.addEventListener('beforeunload', e => { if(host && host.players.size){ e.preventDefault(); e.returnValue = ''; } });
+
+/* ===== 描画とイベント ===== */
+function render(){
+  document.querySelectorAll('nav.tabs button').forEach(b => { const on = b.dataset.tab === tab; b.classList.toggle('on', on); b.setAttribute('aria-current', on ? 'page' : 'false'); });
+  const m = $('#main');
+  if(tab === 'quiz') m.innerHTML = quizView === 'setup' ? setupHTML() : quizView === 'question' ? questionHTML() : quizView === 'result' ? resultHTML() : summaryHTML();
+  else if(tab === 'search'){ m.innerHTML = searchHTML(); updateResults(); }
+  else if(tab === 'party'){ m.innerHTML = partyHTML(); afterPartyRender(); }
+  else m.innerHTML = dataHTML();
+  if(tab === 'quiz' && quizView === 'question'){ const i = $('#answer'); if(i) i.focus({preventScroll:true}); }
+  if(tab === 'quiz' && quizView === 'result'){ const b = $('#nextbtn'); if(b) b.focus({preventScroll:true}); }
+}
+function toggle(arr, v){ const i = arr.indexOf(v); i >= 0 ? arr.splice(i, 1) : arr.push(v); }
+
+document.addEventListener('click', e => {
+  const tb = e.target.closest('nav.tabs button');
+  if(tb){ tab = tb.dataset.tab; render(); window.scrollTo(0, 0); return; }
+  if(e.target.id === 'sheet'){ closeDetail(); return; }
+  const t = e.target.closest('[data-act]'); if(!t) return;
+  const v = t.dataset.v, act = t.dataset.act;
+  switch(act){
+    case 'fmt': toggle(quizCfg.formats, v); saveCfg(); render(); break;
+    case 'cfield': toggle(quizCfg.customFields, v); saveCfg(); render(); break;
+    case 'qciv': toggle(quizCfg.civs, v); saveCfg(); render(); break;
+    case 'count': quizCfg.count = Number(v); saveCfg(); render(); break;
+    case 'mode': quizCfg.mode = v; saveCfg(); render(); break;
+    case 'clear-range': searchRange = null; render(); break;
+    case 'start': startQuiz(); window.scrollTo(0, 0); break;
+    case 'submit': submitAnswer($('#answer').value); window.scrollTo(0, 0); break;
+    case 'choose': submitAnswer(session.q.choices[Number(t.dataset.i)]); window.scrollTo(0, 0); break;
+    case 'skip': submitAnswer(''); window.scrollTo(0, 0); break;
+    case 'hint': session.q.hint = true; { const val = $('#answer') ? $('#answer').value : ''; render(); if($('#answer')) $('#answer').value = val; } break;
+    case 'next': if(session.idx >= session.total){ quizView = 'summary'; render(); } else nextQuestion(); window.scrollTo(0, 0); break;
+    case 'finish': quizView = session.log.length ? 'summary' : 'setup'; render(); window.scrollTo(0, 0); break;
+    case 'again': startQuiz(); window.scrollTo(0, 0); break;
+    case 'to-setup': quizView = 'setup'; render(); window.scrollTo(0, 0); break;
+    case 'detail': openDetail(t.dataset.id); break;
+    case 'close': closeDetail(); break;
+    case 'sciv': toggle(search.civs, v); search.limit = 100; render(); break;
+    case 'scivmode': search.civMode = v; render(); break;
+    case 'sreset': search = {name:'', text:'', civs:[], civMode:'any', cmin:'', cmax:'', pmin:'', pmax:'', type:'', rarity:'', set:'', sort:'cost', limit:100}; render(); break;
+    case 'more': search.limit += 100; updateResults(); break;
+    case 'search-to-quiz': searchRange = new Set(lastResults.map(c => c.id)); quizCfg.civs = []; quizCfg.set = ''; saveCfg(); tab = 'quiz'; quizView = 'setup'; render(); window.scrollTo(0, 0); break;
+    case 'reset-data':
+      if(host && host.phase !== 'lobby'){ importReport = {fatal:'大会の進行中はカードデータを入れ替えられません。大会が終わってから元に戻してください。'}; render(); break; }
+      (async () => { await store.del('cards'); cards = SAMPLE.map(prepCard); dataSource = 'sample'; searchRange = null; session = null; quizView = 'setup'; importReport = null; rebuild(); render(); })(); break;
+    case 'copy-tpl': (async () => { try{ await navigator.clipboard.writeText(TEMPLATE); t.textContent = 'コピーしました'; }catch(err){ t.textContent = 'コピーできませんでした。上の枠から選択してください'; } })(); break;
+    case 'goto-quiz': tab = 'quiz'; quizView = 'setup'; render(); window.scrollTo(0, 0); break;
+    case 'pcfg': { const k = t.dataset.k, val = k === 'mode' ? v : Number(v); partyCfg[k] = val; saveJSON('dmpq-party', partyCfg); if(host && host.phase === 'lobby') host.cfg[k] = val; render(); if(host && $('details.panel')) $('details.panel').open = true; } break;
+    case 'host-create': createRoom(); break;
+    case 'host-start': partyError = ''; hostStart(); window.scrollTo(0, 0); break;
+    case 'host-close-q': closeQuestion(); break;
+    case 'host-next': hostNext(); window.scrollTo(0, 0); break;
+    case 'host-back': host.phase = 'lobby'; hostSync(); break;
+    case 'host-close': if(confirm('部屋を閉じますか？参加者との接続が切れます。')) closeRoom(); break;
+    case 'copy-url': (async () => { try{ await navigator.clipboard.writeText(joinURL(host.code)); t.textContent = 'コピーしました'; }catch(err){ t.textContent = 'コピーできませんでした'; } })(); break;
+    case 'join': joinRoom($('#j-code').value, $('#j-name').value); break;
+    case 'rejoin': joinRoom(player.code, player.name); break;
+    case 'leave': if(player && player.status === 'joined' && !confirm('大会から退出しますか？')) break; leaveRoom(); break;
+    case 'p-submit': playerSubmit($('#p-answer').value); break;
+    case 'p-choose': playerSubmit(player.state.q.choices[Number(t.dataset.i)]); break;
+    case 'reset-stats': if(confirm('これまでの成績と苦手記録を消しますか？')){ stats = {total:0, correct:0, cards:{}}; saveJSON('dmpq-stats', stats); render(); } break;
+  }
+});
+document.addEventListener('input', e => {
+  const k = e.target.dataset && e.target.dataset.s;
+  if(k){ search[k] = e.target.value; search.limit = 100; updateResults(); }
+});
+document.addEventListener('change', e => {
+  const el = e.target;
+  if(el.dataset.s){ search[el.dataset.s] = el.value; updateResults(); return; }
+  if(el.dataset.bind === 'qset'){ quizCfg.set = el.value; saveCfg(); render(); return; }
+  if(el.id === 'csvfile' && el.files[0]){ handleFile(el.files[0]); return; }
+  if(el.hasAttribute && el.hasAttribute('data-pbonus')){ partyCfg.bonus = el.checked; saveJSON('dmpq-party', partyCfg); if(host && host.phase === 'lobby') host.cfg.bonus = el.checked; return; }
+  if(el.dataset.set){
+    const k = el.dataset.set;
+    if(k === 'article') settings.article = el.checked;
+    else { const n = Number(el.value); if(!Number.isNaN(n)) settings[k] = Math.min(100, Math.max(0, n)) / 100; }
+    saveJSON('dmpq-settings', settings); cards.forEach(buildKeys);
+  }
+});
+document.addEventListener('keydown', e => {
+  if(e.isComposing || e.keyCode === 229) return;
+  if(e.key === 'Escape' && !$('#sheet').hidden){ closeDetail(); return; }
+  if(e.key !== 'Enter') return;
+  if(e.target.id === 'answer'){ e.preventDefault(); submitAnswer(e.target.value); window.scrollTo(0, 0); return; }
+  if(e.target.id === 'p-answer'){ e.preventDefault(); playerSubmit(e.target.value); return; }
+  if(e.target.id === 'j-code' || e.target.id === 'j-name'){ e.preventDefault(); joinRoom($('#j-code').value, $('#j-name').value); return; }
+});
+
+(async function init(){
+  if(playerMode){
+    document.body.classList.add('player-mode'); tab = 'party';
+    document.querySelector('header.top h1').textContent = 'デュエプレ クイズ大会';
+  }
+  await store.open();
+  const saved = playerMode ? null : await store.get('cards');
+  if(saved && saved.length){ cards = saved.map(prepCard); dataSource = 'csv'; }
+  else { cards = SAMPLE.map(prepCard); dataSource = 'sample'; }
+  rebuild();
+  if(playerMode) $('#meta').textContent = `部屋 ${roomParam}`;
+  render();
+})();
+</script>
+</body>
+</html>
