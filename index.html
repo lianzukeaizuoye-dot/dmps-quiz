@@ -17,6 +17,7 @@
   --bg:#EEF1F7; --surface:#FFFFFF; --surface2:#E4E8F2; --ink:#151B33; --sub:#59627F; --line:#CDD3E2;
   --primary:#2A3A9E; --on-primary:#FFFFFF; --primary-soft:#DDE2F7;
   --g-great:#B07D00; --g-good:#1E6FD9; --g-tri:#C25F00; --g-bad:#CF2B2B;
+  --target:#B3360B;
   --c-light:#E0B000; --c-light-ink:#3A2E00; --c-water:#1F7AE0; --c-dark:#5A4475; --c-fire:#DD3324; --c-nature:#2E9A46; --c-zero:#8A8FA3;
   color-scheme:light;
   box-sizing:border-box;
@@ -28,6 +29,7 @@
     --bg:#0F1328; --surface:#191F3D; --surface2:#232A4E; --ink:#ECEFFA; --sub:#9BA4C6; --line:#2E3762;
     --primary:#8EA0FF; --on-primary:#0F1328; --primary-soft:#28305A;
     --g-great:#F2C230; --g-good:#6AA8FF; --g-tri:#FFA94D; --g-bad:#FF6B6B;
+    --target:#FFB46B;
     --c-dark:#8B6FB0;
     color-scheme:dark;
   }
@@ -36,6 +38,7 @@
   --bg:#0F1328; --surface:#191F3D; --surface2:#232A4E; --ink:#ECEFFA; --sub:#9BA4C6; --line:#2E3762;
   --primary:#8EA0FF; --on-primary:#0F1328; --primary-soft:#28305A;
   --g-great:#F2C230; --g-good:#6AA8FF; --g-tri:#FFA94D; --g-bad:#FF6B6B;
+  --target:#FFB46B;
   --c-dark:#8B6FB0;
   color-scheme:dark;
 }
@@ -114,6 +117,7 @@ label.field > *{margin-top:4px}
 .progress span{display:block;height:100%;background:var(--primary)}
 .clue{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 18px;margin-bottom:16px}
 .ask{font-weight:700;font-size:15px;color:var(--sub);margin-bottom:12px}
+.ask .target{color:var(--target);font-weight:900;font-size:1.12em}
 blockquote.ft{margin:0;font-size:19px;line-height:1.8;font-style:italic;border-left:4px solid var(--primary);padding:2px 0 2px 14px}
 .cardtext{font-size:16px;line-height:1.8;white-space:normal}
 .spec{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
@@ -192,6 +196,11 @@ pre.tpl{background:var(--surface2);border-radius:8px;padding:10px 12px;font-size
 .setrow small{display:block;color:var(--sub);font-size:12px}
 .check{display:flex;align-items:center;gap:10px;padding:10px 0;font-size:14px;border-top:1px solid var(--line)}
 .check input{width:22px;height:22px}
+details.setpick{margin-top:4px}
+details.setpick summary{cursor:pointer;font-size:13px;color:var(--sub);font-weight:700;padding:6px 0}
+details.setpick summary b{color:var(--ink)}
+.setlist{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:var(--surface);margin-top:8px}
+.setlist .check:first-child{border-top:0}
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
 /* party */
@@ -205,6 +214,17 @@ body.player-mode main{padding-bottom:calc(32px + env(safe-area-inset-bottom,0px)
 .pchip{padding:6px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-weight:700;font-size:14px}
 .pchip.off{opacity:.45}
 .pchip.done{border-color:var(--primary);background:var(--primary-soft)}
+.pchip .kick{appearance:none;margin-left:6px;padding:0 8px;min-height:26px;border-radius:999px;border:1px solid var(--line);background:var(--surface2);color:var(--g-bad);font-weight:700;font-size:12px;cursor:pointer}
+.pchip .kick:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+ul.reslist li.me{background:var(--primary-soft)}
+.nextcount{text-align:center;font-weight:700;color:var(--sub);margin:0 0 12px}
+.nextcount b{font-family:'Dela Gothic One',sans-serif;font-size:22px;color:var(--ink);margin:0 2px}
+.countdown{position:fixed;inset:0;z-index:15;display:grid;place-items:center;pointer-events:none}
+.countdown[hidden]{display:none}
+.countdown span{display:grid;place-items:center;width:min(56vw,240px);height:min(56vw,240px);border-radius:50%;background:var(--surface);border:6px solid var(--primary);color:var(--primary);font-family:'Dela Gothic One',sans-serif;font-size:min(36vw,150px);line-height:1;box-shadow:0 10px 40px rgba(10,14,30,.35)}
+.countdown span.pop{animation:cdpop .45s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes cdpop{from{transform:scale(1.5);opacity:0}to{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion: reduce){.countdown span.pop{animation:none}}
 .timer{display:flex;align-items:center;gap:12px;margin-bottom:14px}
 .tnum{font-family:'Dela Gothic One',sans-serif;font-size:30px;min-width:2.2ch;text-align:right;line-height:1}
 .tbar{flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden}
@@ -237,6 +257,7 @@ ul.reslist small{display:block;color:var(--sub);font-size:13px;overflow-wrap:any
   <button data-tab="search">検索</button>
   <button data-tab="data">データ</button>
 </div></nav>
+<div class="countdown" id="countdown" hidden aria-hidden="true"><span></span></div>
 <div class="sheet-wrap" id="sheet" hidden><div class="sheet" role="dialog" aria-modal="true" aria-label="カード詳細" id="sheet-body"></div></div>
 
 <script>
@@ -303,11 +324,17 @@ let settings = loadJSON('dmpq-settings', {th2:0.6, th3:0.3, margin:0.1, article:
 // カード別の成績は、id が __proto__ などでも壊れないようにプロトタイプのないオブジェクトに入れる（保存形式は変わらない）
 const statCards = o => Object.assign(Object.create(null), o && typeof o === 'object' && !Array.isArray(o) ? o : {});
 let stats = loadJSON('dmpq-stats', {total:0, correct:0, cards:{}}); stats.cards = statCards(stats.cards);
-let quizCfg = loadJSON('dmpq-quiz', {formats:['ft','spec'], customFields:['civ','cost','power'], civs:[], set:'', count:10, mode:'free'});
+let quizCfg = loadJSON('dmpq-quiz', {formats:['ft','spec'], customFields:['civ','cost','power'], civs:[], sets:[], count:10, mode:'free'});
+// 以前の設定（収録弾を1つだけ選ぶ set）を、複数選べる sets に移す。空の配列は「すべて」
+if(Object.prototype.hasOwnProperty.call(quizCfg, 'set')){ if(typeof quizCfg.set === 'string' && quizCfg.set && !(Array.isArray(quizCfg.sets) && quizCfg.sets.length)) quizCfg.sets = [quizCfg.set]; delete quizCfg.set; }
+quizCfg.sets = Array.isArray(quizCfg.sets) ? quizCfg.sets.filter(v => typeof v === 'string' && v) : [];
+// 「すべて解除」の状態。空の配列（＝すべて）と区別するため、収録弾の名前にならない値だけを入れる（どのカードにも当たらないので範囲は0件）
+const SETS_NONE = '\u0000none';
+const setsNone = () => quizCfg.sets.length > 0 && quizCfg.sets.every(x => x === SETS_NONE);
 let cards = [], byId = new Map(), dataSource = 'sample';
 let UNIQ = {}, customCache = null, NAME_SET = new Set();
-let tab = 'quiz', quizView = 'setup', session = null, searchRange = null, importReport = null;
-let search = {name:'', text:'', civs:[], civMode:'any', cmin:'', cmax:'', pmin:'', pmax:'', type:'', rarity:'', set:'', sort:'cost', limit:100};
+let tab = 'quiz', quizView = 'setup', session = null, searchRange = null, importReport = null, setPickOpen = false, kickPickOpen = false;
+let search = {name:'', text:'', race:'', civs:[], civMode:'any', cmin:'', cmax:'', pmin:'', pmax:'', type:'', rarity:'', set:'', sort:'cost', limit:100};
 
 const CIVS = ['光','水','闇','火','自然'];
 const SOURCE_LABEL = {sample:'架空カードのサンプル', csv:'読み込んだCSV'};
@@ -411,7 +438,8 @@ function prepCard(r){
     id:String(r.id), name:String(r.name ?? '').trim(), reading:String(r.reading ?? '').trim(), type:String(r.type ?? '').trim(),
     civ:splitList(r.civ), cost:r.cost, power:(r.power === '' || r.power === undefined) ? null : r.power,
     text:String(r.text ?? '').replace(/\\n/g, '\n').trim(), rarity:String(r.rarity ?? '').trim(), set:splitList(r.set),
-    flavor:String(r.flavor ?? '').replace(/\\n/g, '\n').trim(), twin_id:String(r.twin_id ?? '').trim(), aliases:splitList(r.aliases)
+    flavor:String(r.flavor ?? '').replace(/\\n/g, '\n').trim(), twin_id:String(r.twin_id ?? '').trim(), aliases:splitList(r.aliases),
+    race:splitList(r.race)  // 種族（race 列の無いCSV・保存済みデータでは空）
   };
   return c;
 }
@@ -459,13 +487,26 @@ function rebuild(){
   $('#meta').textContent = `${cards.length}枚${dataSource === 'sample' ? '（サンプル）' : ''}`;
 }
 function rangeCards(){
-  return cards.filter(c => (!searchRange || searchRange.has(c.id)) && (!quizCfg.civs.length || c.civ.some(x => quizCfg.civs.includes(x))) && (!quizCfg.set || c.set.includes(quizCfg.set)));
+  const sets = new Set(quizCfg.sets);
+  return cards.filter(c => (!searchRange || searchRange.has(c.id)) && (!quizCfg.civs.length || c.civ.some(x => quizCfg.civs.includes(x))) && (!sets.size || c.set.some(x => sets.has(x))));
 }
 function eligible(fmt, range){ if(fmt === 'num') return range; const s = fmt === 'custom' ? customUniq() : UNIQ[fmt]; return range.filter(c => s.has(c.id)); }
 const uniqVals = f => [...new Set(cards.flatMap(f))].filter(Boolean);
+// 収録弾を新しい順（の推定）に並べる。各弾を最初の収録弾とするカードの id の数字の最大値が大きいほど新しいとみなす（再録だけの弾は含むカード全体で見る）
+const idNum = id => { const m = String(id).match(/\d+/g); return m ? Number(m[m.length - 1]) : -1; };
+function setsNewestFirst(){
+  const first = new Map(), any = new Map(), order = new Map();
+  const up = (m, k, v) => { if(!m.has(k) || m.get(k) < v) m.set(k, v); };
+  for(const c of cards){
+    const n = idNum(c.id);
+    c.set.forEach((s, i) => { if(!order.has(s)) order.set(s, order.size); up(any, s, n); if(i === 0) up(first, s, n); });
+  }
+  const key = s => first.has(s) ? first.get(s) : any.get(s);
+  return [...order.keys()].sort((a, b) => key(b) - key(a) || order.get(a) - order.get(b));
+}
 
 /* ===== CSV 読み込み ===== */
-const HEADER_MAP = {id:'id',name:'name','カード名':'name','名前':'name',reading:'reading','読み方':'reading','読み':'reading',type:'type','カードタイプ':'type','タイプ':'type',civ:'civ','文明':'civ',cost:'cost','コスト':'cost',power:'power','パワー':'power',text:'text','カードテキスト':'text','テキスト':'text',rarity:'rarity','レアリティ':'rarity',set:'set','収録弾':'set',flavor:'flavor','フレーバーテキスト':'flavor','フレーバー':'flavor',ft:'flavor',twin_id:'twin_id',aliases:'aliases','別名':'aliases'};
+const HEADER_MAP = {id:'id',name:'name','カード名':'name','名前':'name',reading:'reading','読み方':'reading','読み':'reading',type:'type','カードタイプ':'type','タイプ':'type',civ:'civ','文明':'civ',cost:'cost','コスト':'cost',power:'power','パワー':'power',text:'text','カードテキスト':'text','テキスト':'text',rarity:'rarity','レアリティ':'rarity',set:'set','収録弾':'set',flavor:'flavor','フレーバーテキスト':'flavor','フレーバー':'flavor',ft:'flavor',twin_id:'twin_id',aliases:'aliases','別名':'aliases',race:'race','種族':'race'};
 function toInt(v){ const s = String(v ?? '').normalize('NFKC').replace(/[,\s]/g, ''); if(s === '') return null; if(!/^-?\d+$/.test(s)) return NaN; return parseInt(s, 10); }
 const RESERVED_IDS = ['__proto__', 'constructor', 'prototype'];
 function importRows(rows){
@@ -522,7 +563,9 @@ function setupHTML(){
   const range = rangeCards();
   const counts = Object.fromEntries(FORMATS.map(f => [f[0], eligible(f[0], range).length]));
   const total = new Set(quizCfg.formats.flatMap(f => eligible(f, range).map(c => c.id))).size;
-  const sets = uniqVals(c => c.set);
+  const sets = setsNewestFirst(), known = new Set(sets);
+  const picked = quizCfg.sets.filter(s => known.has(s)), gone = quizCfg.sets.filter(s => s !== SETS_NONE).length - picked.length;
+  const allSets = !quizCfg.sets.length;
   const acc = stats.total ? Math.round(stats.correct / stats.total * 100) : null;
   return `
   <section class="block"><h2>どの問題で遊ぶ？</h2><p class="lead">答えが1枚に決まる問題だけを出題します。${acc !== null ? `これまで${stats.total}問、正答率${acc}%。` : ''}</p>
@@ -537,8 +580,12 @@ function setupHTML(){
   <section class="block"><h3>出題範囲</h3>
     ${searchRange ? `<div class="banner"><span>検索結果の${searchRange.size}枚から出題します</span><button class="btn ghost" data-act="clear-range">解除</button></div>` : ''}
     <div class="chips" style="margin-bottom:10px">${CIVS.map(v => `<button class="chip ${quizCfg.civs.includes(v) ? 'on' : ''}" data-act="qciv" data-v="${v}" aria-pressed="${quizCfg.civs.includes(v)}">${pips([v])}${v}</button>`).join('')}</div>
-    <label class="field">収録弾<select data-bind="qset"><option value="">すべて</option>${sets.map(s => `<option ${quizCfg.set === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label>
-    <p class="note">文明を選ばなければ全文明から出題します。</p>
+    <details class="setpick" id="setpick" ${setPickOpen ? 'open' : ''}><summary>収録弾：<b>${allSets ? 'すべて' : setsNone() ? '選択なし' : `${picked.length}弾を選択中`}</b>${gone ? `（いまのデータに無い${gone}弾を含む）` : ''}</summary>
+      <div class="row" style="margin-top:4px"><button class="btn" data-act="qsets-all">すべて選択</button><button class="btn" data-act="qsets-none">すべて解除</button></div>
+      ${!allSets && !picked.length ? '<p class="ng" style="margin:8px 0 0">収録弾を1つ以上選んでください</p>' : ''}
+      <div class="setlist">${sets.map(s => `<label class="check"><input type="checkbox" data-qset value="${esc(s)}" ${allSets || quizCfg.sets.includes(s) ? 'checked' : ''}>${esc(s)}</label>`).join('') || '<p class="note">収録弾のデータがありません</p>'}</div>
+    </details>
+    <p class="note">文明を選ばなければ全文明から出題します。収録弾は最初はすべて選ばれています（新しい弾から並べています。順は推定です）。</p>
   </section>
   <section class="block"><div class="grid2">
     <div><h3>問題数</h3><div class="seg">${[[10,'10問'],[20,'20問'],[0,'エンドレス']].map(([v, l]) => `<button class="${quizCfg.count === v ? 'on' : ''}" data-act="count" data-v="${v}">${l}</button>`).join('')}</div></div>
@@ -605,14 +652,16 @@ function publicQ(q, customFields){
   else if(q.fmt === 'num'){ p.name = c.name; p.civ = c.civ; p.type = c.type; }
   return p;
 }
+// 問いかけ文の「答える内容」（カード名・パワー・コスト）を目立たせる
+const askTarget = t => `<span class="target">${esc(t)}</span>`;
 function clueHTML(p){
   const civ = Array.isArray(p.civ) ? p.civ.map(String) : [];
   switch(p.fmt){
-    case 'ft': return `<p class="ask">このフレーバーテキストのカードは？</p><blockquote class="ft">${nl(esc(p.flavor))}</blockquote>`;
-    case 'text': return `<p class="ask">このテキストのカードは？</p><div class="cardtext">${nl(esc(p.text))}</div>`;
-    case 'spec': return `<p class="ask">このスペックのカードは？</p><div class="spec">${pips(civ, 'lg')}<div class="spec-num"><span class="k">コスト</span><span class="v">${esc(p.cost)}</span></div><div class="spec-num"><span class="k">パワー</span><span class="v">${esc(p.power)}</span></div></div>`;
-    case 'custom': return `<p class="ask">この条件に当てはまるカードは？</p><dl class="facts">${(Array.isArray(p.facts) ? p.facts : []).map(f => `<dt>${esc(f.label)}</dt><dd>${Array.isArray(f.civ) ? pips(f.civ.map(String)) + ' ' : ''}${esc(f.value)}</dd>`).join('')}</dl>`;
-    case 'num': return `<p class="ask">このカードの${p.field === 'power' ? 'パワー' : 'コスト'}は？</p><p class="qname">${esc(p.name)}</p><p style="margin:0">${pips(civ)} <span style="color:var(--sub);font-size:14px">${esc(p.type)}</span></p>`;
+    case 'ft': return `<p class="ask">このフレーバーテキストの${askTarget('カード名')}は？</p><blockquote class="ft">${nl(esc(p.flavor))}</blockquote>`;
+    case 'text': return `<p class="ask">このテキストの${askTarget('カード名')}は？</p><div class="cardtext">${nl(esc(p.text))}</div>`;
+    case 'spec': return `<p class="ask">このスペックの${askTarget('カード名')}は？</p><div class="spec">${pips(civ, 'lg')}<div class="spec-num"><span class="k">コスト</span><span class="v">${esc(p.cost)}</span></div><div class="spec-num"><span class="k">パワー</span><span class="v">${esc(p.power)}</span></div></div>`;
+    case 'custom': return `<p class="ask">この条件に当てはまる${askTarget('カード名')}は？</p><dl class="facts">${(Array.isArray(p.facts) ? p.facts : []).map(f => `<dt>${esc(f.label)}</dt><dd>${Array.isArray(f.civ) ? pips(f.civ.map(String)) + ' ' : ''}${esc(f.value)}</dd>`).join('')}</dl>`;
+    case 'num': return `<p class="ask">このカードの${askTarget(p.field === 'power' ? 'パワー' : 'コスト')}は？</p><p class="qname">${esc(p.name)}</p><p style="margin:0">${pips(civ)} <span style="color:var(--sub);font-size:14px">${esc(p.type)}</span></p>`;
   }
   return '';
 }
@@ -678,6 +727,7 @@ function searchHTML(){
   <div class="panel" style="display:grid;gap:12px">
     <label class="field">カード名・読み方<input type="search" data-s="name" value="${esc(search.name)}" placeholder="例：ガルド、えんが"></label>
     <label class="field">テキスト・フレーバー<input type="search" data-s="text" value="${esc(search.text)}" placeholder="例：ブロッカー -呪文"></label>
+    <label class="field">種族<input type="search" data-s="race" value="${esc(search.race)}" placeholder="例：ドラゴン"></label>
     <div><h3>文明</h3><div class="chips">${CIVS.map(v => `<button class="chip ${search.civs.includes(v) ? 'on' : ''}" data-act="sciv" data-v="${v}" aria-pressed="${search.civs.includes(v)}">${pips([v])}${v}</button>`).join('')}</div>
       <div class="seg" style="margin-top:8px">${[['any','いずれかを含む'],['all','すべてを含む'],['mono','単色のみ']].map(([v, l]) => `<button class="${search.civMode === v ? 'on' : ''}" data-act="scivmode" data-v="${v}">${l}</button>`).join('')}</div></div>
     <div class="grid2">
@@ -695,7 +745,7 @@ function searchHTML(){
   <div id="results"></div>`;
 }
 function runSearch(){
-  const qn = norm(search.name);
+  const qn = norm(search.name), rq = norm(search.race);
   const toks = search.text.normalize('NFKC').split(/\s+/).filter(Boolean);
   const inc = toks.filter(t => !t.startsWith('-')).map(norm).filter(Boolean);
   const exc = toks.filter(t => t.startsWith('-') && t.length > 1).map(t => norm(t.slice(1))).filter(Boolean);
@@ -703,6 +753,7 @@ function runSearch(){
   const cmin = num(search.cmin), cmax = num(search.cmax), pmin = num(search.pmin), pmax = num(search.pmax);
   let res = cards.filter(c => {
     if(qn && !c._keys.some(k => k.includes(qn))) return false;
+    if(rq && !c.race.some(x => norm(x).includes(rq))) return false;
     if(inc.length || exc.length){
       const hay = norm(c.text + c.flavor + c.type);
       if(!inc.every(t => hay.includes(t))) return false;
@@ -748,16 +799,25 @@ function openDetail(id){
   const c = byId.get(id); if(!c) return;
   const s = stats.cards[c.id] || {r:0, w:0};
   const twin = c.twin_id && byId.get(c.twin_id);
-  $('#sheet-body').innerHTML = `
-    <button class="btn close" data-act="close">閉じる</button>
-    <h2>${esc(c.name)}</h2><p class="reading">${esc(c.reading)}</p>
-    <p>${pips(c.civ)} ${esc(c.civ.join('/'))}　<span style="color:var(--sub)">${esc(c.type)}</span></p>
-    <div class="statsgrid"><div><span class="k">コスト</span><span class="v">${esc(c.cost)}</span></div><div><span class="k">パワー</span><span class="v">${esc(c.power ?? '—')}</span></div><div><span class="k">レアリティ</span><span class="v">${esc(c.rarity) || '—'}</span></div><div><span class="k">収録弾</span><span class="v">${esc(c.set.join('・')) || '—'}</span></div></div>
-    ${c.text ? `<div class="textbox">${nl(esc(c.text))}</div>` : ''}
-    ${c.flavor ? `<div class="textbox ft">${nl(esc(c.flavor))}</div>` : ''}
+  showSheet(`${cardBodyHTML(c)}
     ${twin ? `<p><button class="btn" data-act="detail" data-id="${esc(twin.id)}">もう片面「${esc(twin.name)}」を見る</button></p>` : ''}
     ${c.aliases.length ? `<p class="note">別名：${esc(c.aliases.join('、'))}</p>` : ''}
-    <p class="note">クイズの成績：正解${s.r}回、ミス${s.w}回</p>`;
+    <p class="note">クイズの成績：正解${s.r}回、ミス${s.w}回</p>`);
+}
+// カードの公開情報の表示（一人用の詳細と、大会の参加者が受け取った正解カードで共通。値はすべて esc する）
+// c: name・reading・type・cost・text・flavor（文字列）、power（文字列・数値・null）、civ・race・set（文字列の配列）、rarity（無ければ表示しない）
+function cardBodyHTML(c){
+  const race = Array.isArray(c.race) ? c.race : [];
+  return `<button class="btn close" data-act="close">閉じる</button>
+    <h2>${esc(c.name)}</h2><p class="reading">${esc(c.reading)}</p>
+    <p>${pips(c.civ)} ${esc(c.civ.join('/'))}　<span style="color:var(--sub)">${esc(c.type)}</span></p>
+    ${race.length ? `<p style="margin-top:-6px">種族：${esc(race.join('／'))}</p>` : ''}
+    <div class="statsgrid"><div><span class="k">コスト</span><span class="v">${esc(c.cost)}</span></div><div><span class="k">パワー</span><span class="v">${c.power == null || c.power === '' ? '—' : esc(c.power)}</span></div>${c.rarity !== undefined ? `<div><span class="k">レアリティ</span><span class="v">${esc(c.rarity) || '—'}</span></div>` : ''}<div><span class="k">収録弾</span><span class="v">${esc(c.set.join('・')) || '—'}</span></div></div>
+    ${c.text ? `<div class="textbox">${nl(esc(c.text))}</div>` : ''}
+    ${c.flavor ? `<div class="textbox ft">${nl(esc(c.flavor))}</div>` : ''}`;
+}
+function showSheet(html){
+  $('#sheet-body').innerHTML = html;
   $('#sheet').hidden = false;
   $('#sheet-body').scrollTop = 0;
   $('#sheet .close').focus({preventScroll:true});
@@ -765,7 +825,7 @@ function openDetail(id){
 function closeDetail(){ $('#sheet').hidden = true; }
 
 /* ===== データ画面 ===== */
-const TEMPLATE = 'id,name,reading,type,civ,cost,power,text,rarity,set,flavor,twin_id,aliases\nX-001,炎の剣士,ほのおのけんし,クリーチャー,火,5,6000,"■スピードアタッカー\\n■W・ブレイカー",VR,第1弾,炎は消えない。,,';
+const TEMPLATE = 'id,name,reading,type,civ,cost,power,text,rarity,set,flavor,twin_id,aliases,race\nX-001,炎の剣士,ほのおのけんし,クリーチャー,火,5,6000,"■スピードアタッカー\\n■W・ブレイカー",VR,第1弾,炎は消えない。,,,ヒューマノイド';
 function dataHTML(){
   const acc = stats.total ? Math.round(stats.correct / stats.total * 100) : 0;
   const rep = importReport;
@@ -782,7 +842,7 @@ function dataHTML(){
   </section>
   <section class="block panel">
     <h3>CSVの形式</h3>
-    <p style="font-size:14px">1行目を見出し行にして、UTF-8で保存してください。見出しは英語名でも「カード名」「読み方」のような日本語でも読めます。多色や再録は「/」で区切り、テキストの改行は「\\n」と書きます。必須はカード名・読み方・コストです。</p>
+    <p style="font-size:14px">1行目を見出し行にして、UTF-8で保存してください。見出しは英語名でも「カード名」「読み方」のような日本語でも読めます。多色・再録・複数の種族は「/」で区切り、テキストの改行は「\\n」と書きます。必須はカード名・読み方・コストです。</p>
     <pre class="tpl">${esc(TEMPLATE)}</pre>
     <button class="btn" data-act="copy-tpl">見出し行と記入例をコピー</button>
   </section>
@@ -803,7 +863,17 @@ function dataHTML(){
 /* ===== クイズ大会（PeerJS による端末間通信） ===== */
 const PEER_PREFIX = 'dmpq-party-v1-';
 const BASE_PTS = {'◎':100, '○':70, '△':30, [X]:0};
-let partyCfg = loadJSON('dmpq-party', {count:10, time:30, mode:'free', bonus:true});
+let partyCfg = loadJSON('dmpq-party', {count:10, time:30, mode:'free', bonus:true, game:'normal'});
+/* 大会の形式。kabu・five はお題（makeTheme）に合うカード名を答える形式で、回答方式は自由入力だけ */
+const GAMES = {
+  normal:{label:'通常', rule:'全員が同じ問題に答えます。評価と速さで点が入ります。'},
+  dobon:{label:'ドボン', rule:'出題と配点は通常と同じ。✖︎か時間切れで失格になり、以後は観戦です。最後まで生き残った人が優勝です。'},
+  kabu:{label:'かぶっちゃやーよ', rule:'お題に合うカード名を全員が1枚ずつ答えます。ほかの人と同じカードを答えると0点です。'},
+  five:{label:'ファイブボンバー', rule:'ランダムな順番で1人ずつ、お題に合うカード名をリレーで答えます。そのお題で出たカードは無効です。'}
+};
+const THEME_GAMES = ['kabu', 'five'];
+const gameOf = cfg => own(GAMES, cfg && cfg.game) ? cfg.game : 'normal';
+partyCfg.game = gameOf(partyCfg);
 let host = null, player = null, partyError = '';
 const params = new URLSearchParams(location.search);
 const roomParam = (params.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
@@ -820,19 +890,107 @@ function peerErrText(err){
   return `接続できませんでした（${t || '不明なエラー'}）。会社などのネットワークでは、端末同士の直接接続がブロックされることがあります。`;
 }
 function waitingHTML(t){ return `<div class="waiting">${t}</div>`; }
-function rankRows(list){
-  const sorted = [...list].sort((a, b) => b.score - a.score);
-  let prev = null, rank = 0;
-  return sorted.map((r, i) => { if(r.score !== prev){ rank = i + 1; prev = r.score; } return {...r, rank}; });
+// cmp で並べ、cmp が 0（同順）なら同じ順位にする。既定は点数の高い順
+const byScore = (a, b) => b.score - a.score;
+function rankRows(list, cmp = byScore){
+  const sorted = [...list].sort(cmp);
+  let rank = 0;
+  return sorted.map((r, i) => { if(!i || cmp(sorted[i - 1], r) !== 0) rank = i + 1; return {...r, rank}; });
 }
 function boardHTML(rows, limit = 30){
-  return `<ol class="board">${rows.slice(0, limit).map(r => `<li class="${r.me ? 'me' : ''} ${r.online === false ? 'off' : ''}"><span class="rk">${esc(r.rank)}</span><span>${esc(r.name)}${r.me ? '（あなた）' : ''}</span><span class="sc">${esc(r.score)}点</span></li>`).join('')}</ol>`;
+  return `<ol class="board">${rows.slice(0, limit).map(r => `<li class="${r.me ? 'me' : ''} ${r.online === false ? 'off' : ''}"><span class="rk">${esc(r.rank)}</span><span>${esc(r.name)}${r.me ? '（あなた）' : ''}${r.out ? ' <small class="ng">失格</small>' : ''}</span><span class="sc">${esc(r.score)}点</span></li>`).join('')}</ol>`;
 }
+// お題の表示（主催者・参加者で共通。text は参加者側では cleanState 済み）
+const themeClueHTML = t => `<p class="ask">お題に当てはまる${askTarget('カード名')}を1つ答えてください</p><p class="qname">${esc(t && t.text)}</p>`;
+const gameInfo = g => own(GAMES, g) ? GAMES[g] : GAMES.normal;
+const ruleHTML = g => `<p class="note" style="margin-top:0">形式：<b>${esc(gameInfo(g).label)}</b>　${esc(gameInfo(g).rule)}</p>`;
 function timerHTML(id){ return `<div class="timer" id="${id}"><span class="tnum">--</span><span class="tbar"><span style="width:100%"></span></span></div>`; }
 function updTimer(sel, rem, dur){
   const el = $(sel); if(!el) return;
   el.querySelector('.tnum').textContent = Math.max(0, Math.ceil(rem / 1000));
   el.querySelector('.tbar span').style.width = Math.max(0, Math.min(100, rem / dur * 100)) + '%';
+}
+/* 正解発表から次の問題までのカウントダウン。主催者が「次の問題」を押すと、残りが NEXT_SHORT_MS より多ければそこまで縮める */
+const MAX_PLAYERS = 30, NEXT_MS = 15000, NEXT_SHORT_MS = 5000;
+const nextSec = rem => Math.max(0, Math.ceil(rem / 1000));
+function nextCountHTML(id, rem, last){ return `<p class="nextcount" id="${id}">${last ? '最終結果' : '次の問題'}まで<b>${esc(nextSec(rem))}</b>秒</p>`; }
+// 小さい表示（id の要素）の秒数と、残り5秒以下の大きな表示（#countdown）を書き換える。rem が null なら大きな表示を消す
+function updNext(sel, rem){
+  const el = sel && $(sel), sec = rem == null ? 0 : nextSec(rem);
+  if(el){ const b = el.querySelector('b'); if(b && b.textContent !== String(sec)) b.textContent = sec; }
+  const box = $('#countdown'), span = box.querySelector('span');
+  const show = tab === 'party' && rem != null && sec > 0 && sec <= NEXT_SHORT_MS / 1000;
+  if(!show){ if(!box.hidden){ box.hidden = true; span.textContent = ''; } return; }
+  box.hidden = false;
+  if(span.textContent !== String(sec)){ span.textContent = sec; span.classList.remove('pop'); void span.offsetWidth; span.classList.add('pop'); }
+}
+/* 正解発表で送る全員分の結果と正解カードの公開情報。主催者は送る前に、参加者は受け取ったあとに同じ関数で型と長さをそろえる */
+const strList = (a, n, len) => Array.isArray(a) ? a.slice(0, n).map(v => str(v, len)) : [];
+const cleanResult = r => ({name:str(r.name, 16), g:str(r.g, 4), pts:fin(r.pts), input:str(r.input, MAX_ANSWER), msg:str(r.msg, 200), me:r.me === true});
+const cleanCard = c => isObj(c) ? {
+  name:str(c.name, 200), reading:str(c.reading, 200), type:str(c.type, 50), civ:strList(c.civ, 8, 20), cost:str(c.cost, 10), power:str(c.power, 10),
+  race:strList(c.race, 8, 50), text:str(c.text, 2000), flavor:str(c.flavor, 1000), set:strList(c.set, 30, 100)
+} : null;
+
+/* --- お題（かぶっちゃやーよ・ファイブボンバー） --- */
+const THEME_WORDS = ['ブロッカー','S・トリガー','W・ブレイカー','T・ブレイカー','スピードアタッカー','マッハファイター','ジャストダイバー','革命チェンジ','侵略','G・ゼロ',
+  'シンパシー','進化','墓地','マナゾーン','シールド','山札','手札','タップ','破壊','パワーアタッカー'];
+const ntext = c => c._ntext ?? (c._ntext = norm(c.text));
+const THEME_NWORDS = THEME_WORDS.map(w => [w, norm(w)]);
+const themeCache = new WeakMap();
+// list（出題範囲のカード）にあるお題の候補をすべて挙げ、キーごとに、当てはまるカードの枚数（n）と異なる名前（names）を1回で集計する
+// 候補は、文明×コスト（範囲にある組み合わせ）・カードタイプ・収録弾・種族（範囲に出てくる値）・テキストの言葉（THEME_WORDS）
+function themeCandidates(list){
+  if(themeCache.has(list)) return themeCache.get(list);
+  const m = new Map();
+  const add = (key, mk, c) => { let e = m.get(key); if(!e){ e = {key, ...mk(), n:0, names:new Set()}; m.set(key, e); } e.n++; e.names.add(c._norm); };
+  for(const c of list){
+    const cost = c.cost;
+    for(const civ of new Set(c.civ)) add(`cc|${civ}|${cost}`, () => ({text:`コスト${cost}の${civ}のカード（多色を含む）`, test:x => x.cost === cost && x.civ.includes(civ)}), c);
+    if(c.type){ const t = c.type; add(`type|${t}`, () => ({text:`カードタイプが「${t}」のカード`, test:x => x.type === t}), c); }
+    for(const st of new Set(c.set)) add(`set|${st}`, () => ({text:`「${st}」に収録されたカード`, test:x => x.set.includes(st)}), c);
+    for(const r of new Set(c.race)) add(`race|${r}`, () => ({text:`種族に「${r}」を持つカード`, test:x => x.race.includes(r)}), c);
+    const t = ntext(c);
+    for(const [w, nw] of THEME_NWORDS) if(nw && t.includes(nw)) add(`word|${w}`, () => ({text:`テキストに「${w}」とあるカード`, test:x => ntext(x).includes(nw)}), c);
+  }
+  const all = [...m.values()];
+  themeCache.set(list, all);
+  return all;
+}
+// list から、条件に合う異なるカード名が minCount 以上あるお題を作る。使っていない（used に無い）候補を順に見て、最初に条件を満たしたものを使う（条件を満たす候補があれば必ず見つかる）
+// 範囲の全カードに当たるお題（例：収録弾を1つだけ選んだときのその弾）は、お題にならないので除く。見つからなければ null
+// 種類（文明×コスト・タイプ・収録弾・言葉・種族）の順と、各種類の中のキーをシャッフルし、種類を順に回りながら1つずつ試す（種類がほぼ同じ確率で出るように）
+function makeTheme(list, minCount, used = new Set()){
+  const byKind = new Map();
+  for(const e of themeCandidates(list)){ const k = e.key.split('|')[0], a = byKind.get(k); a ? a.push(e) : byKind.set(k, [e]); }
+  const queues = shuffle([...byKind.values()]).map(shuffle);
+  for(let i = 0; queues.some(q => i < q.length); i++){
+    for(const q of queues){
+      const e = q[i];
+      if(!e || used.has(e.key) || e.n >= list.length || e.names.size < minCount) continue;
+      return {key:e.key, text:e.text, test:e.test};
+    }
+  }
+  return null;
+}
+// お題の回答を、全カードの名前・読み・別名と照合する。◎（完全一致で、1つの名前に決まる）か○（4文字以上の名前・読み・別名と1文字違いで、候補が1つの名前に決まる）だけを受け付ける
+// 有効なのは、出題範囲（host.rangeIds）にあってお題に合うカード。同じ名前のカードが複数あるときは有効なものを選ぶ
+function matchTheme(text, theme){
+  const ok = c => host.rangeIds.has(c.id) && theme.test(c);
+  const qc = chars(norm(text)).slice(0, MAX_ANSWER), q = qc.join('');
+  if(!q) return {g:X, msg:'回答なし'};
+  let found = host.nameIndex.get(q), g = '◎';
+  if(found && new Set(found.map(c => c._norm)).size > 1) return {g:X, msg:'カードを1枚に決められない'};  // 読み・別名が名前の違う複数のカードに当たる
+  if(!found){
+    const byName = new Map();
+    for(const c of cards){ if(nearCard(qc, c)){ const a = byName.get(c._norm); a ? a.push(c) : byName.set(c._norm, [c]); if(byName.size > 1) break; } }
+    if(byName.size > 1) return {g:X, msg:'カードを1枚に決められない'};
+    if(!byName.size) return {g:X, msg:'カードが見つからない'};
+    found = [...byName.values()][0]; g = '○';
+  }
+  const card = found.find(ok) || found[0];
+  if(!ok(card)) return {g:X, card, msg:`「${card.name}」は${host.rangeIds.has(card.id) ? 'お題に合わない' : '出題範囲外'}`};
+  return {g, card, valid:true, msg:`「${card.name}」`};
 }
 
 /* --- 主催者 --- */
@@ -846,7 +1004,7 @@ function createRoom(){
   if(typeof Peer === 'undefined'){ partyError = '通信用の部品を読み込めませんでした。ネットワークを確認して、ページを開き直してください。'; render(); return; }
   const code = genCode();
   const peer = new Peer(PEER_PREFIX + code, {debug:0});
-  host = {peer, code, players:new Map(), phase:'opening', cfg:{...partyCfg}, idx:0, total:partyCfg.count, used:new Set(), q:null, pub:null, answers:new Map(), results:null, startedAt:0, endsAt:0, share:false, sending:0, dataCount:0, dataStarts:new Map(), dataActive:new Set(), dataDone:new Set(), dataBytes:0};
+  host = {peer, code, players:new Map(), phase:'opening', cfg:{...partyCfg}, idx:0, total:partyCfg.count, used:new Set(), q:null, pub:null, answers:new Map(), results:null, startedAt:0, endsAt:0, nextAt:0, nextTimer:0, banned:new Set(), share:false, sending:0, dataCount:0, dataStarts:new Map(), dataActive:new Set(), dataDone:new Set(), dataBytes:0};
   const me = host;
   peer.on('open', () => { if(host !== me) return; host.phase = 'lobby'; render(); });
   peer.on('error', err => {
@@ -871,15 +1029,18 @@ function hostOnData(conn, m){
   if(!conn._rt || now - conn._rt >= 1000){ conn._rt = now; conn._rn = 0; }
   if(++conn._rn > 50){ try{ conn.close(); }catch(e){} return; }
   if(conn._rn > 10) return;
+  if(conn._kicked) return;  // 除外・リセットで閉じようとしている接続からは受け取らない
   if(!m || typeof m !== 'object') return;
   if(m.t === 'join'){
     const pid = String(m.pid || '').slice(0, 40); if(!pid) return;
     if(conn._pid && conn._pid !== pid) return;
+    if(host.banned && host.banned.has(pid)){ dropConn(conn, {t:'kicked'}); return; }  // 除外した pid は、同じ部屋の間は参加させない
     const name = (typeof m.name === 'string' ? m.name : '').trim().slice(0, 16) || '名無し';
     let p = host.players.get(pid);
     if(!p){
-      if(host.players.size >= 30){ try{ conn.send({t:'error', msg:'満員のため参加できません（最大30人）。'}); }catch(e){} return; }
+      if(host.players.size >= MAX_PLAYERS){ try{ conn.send({t:'error', msg:'満員のため参加できません（最大30人）。'}); }catch(e){} return; }
       p = {pid, name, score:0}; host.players.set(pid, p);
+      if(gameOf(host.cfg) === 'dobon' && (host.phase === 'question' || host.phase === 'reveal')){ p.out = true; p.outAt = 0; }  // ドボンの途中から入った人は観戦
     }
     if(p.conn && p.conn !== conn){ try{ p.conn.close(); }catch(e){} }
     p.name = name; p.conn = conn; p.online = true; conn._pid = pid;
@@ -887,15 +1048,52 @@ function hostOnData(conn, m){
   } else if(m.t === 'answer'){
     const p = host.players.get(conn._pid);
     if(!p || host.phase !== 'question' || m.idx !== host.idx || host.answers.has(p.pid)) return;
-    host.answers.set(p.pid, {text:typeof m.text === 'string' ? m.text.slice(0, MAX_ANSWER) : '', ms:Date.now() - host.startedAt});
-    const online = [...host.players.values()].filter(x => x.online);
-    if(online.length && online.every(x => host.answers.has(x.pid))) closeQuestion();
+    const game = gameOf(host.cfg);
+    if(game === 'dobon' && p.out) return;  // 失格した人の回答は捨てる
+    if(game === 'five' && (!host.turn || host.turn.order[host.turn.i] !== p.pid)) return;  // 順番でない人の回答は捨てる
+    const a = {text:typeof m.text === 'string' ? m.text.slice(0, MAX_ANSWER) : '', ms:Date.now() - host.startedAt};
+    host.answers.set(p.pid, a);
+    if(game === 'five'){ fiveAnswer(p, a); return; }
+    if(allAnswered()) closeQuestion();
     else hostSyncSoon();
   } else if(m.t === 'data-req') hostSendData(conn);
 }
+// 回答を待つ人（ドボンでは失格した人を除く）が全員答えたか。ファイブボンバーは順番で進むので使わない
+function allAnswered(){
+  const wait = [...host.players.values()].filter(x => x.online && !(gameOf(host.cfg) === 'dobon' && x.out));
+  return wait.length > 0 && wait.every(x => host.answers.has(x.pid));
+}
+/* 除外とリセット：知らせてから少し待って接続を閉じる（すぐ閉じると知らせが届かないことがある）。閉じるまでの間に届くものは捨てる */
+function dropConn(conn, msg){
+  if(!conn) return;
+  conn._kicked = true;
+  try{ if(conn.open) conn.send(msg); }catch(e){}
+  setTimeout(() => { try{ conn.close(); }catch(e){} }, 300);
+}
+// 指定した参加者を除外する。pid は参加者の自己申告なので、別の pid で入り直されると防げない
+function hostKick(pid){
+  const p = host && host.players.get(pid); if(!p) return;
+  host.banned.add(pid);
+  host.players.delete(pid); host.answers.delete(pid);
+  if(host.results) host.results = host.results.filter(r => r.pid !== pid);
+  if(host.turn) host.turn.log = host.turn.log.filter(r => r.pid !== pid);  // その人が答えたカードは t.used に残す（既出のまま。仕様）
+  dropConn(p.conn, {t:'kicked'});
+  if(host.phase === 'question'){
+    if(gameOf(host.cfg) === 'five'){ if(host.turn && host.turn.order[host.turn.i] === pid){ fiveAdvance(); return; } }
+    else if(allAnswered()){ closeQuestion(); return; }
+  }
+  hostSync();
+}
+// 参加者を全員外す（除外とは違い、もう一度参加できる）。進行中はできない
+function hostResetPlayers(){
+  if(!host || (host.phase !== 'lobby' && host.phase !== 'final')) return;
+  for(const p of host.players.values()) dropConn(p.conn, {t:'kicked', reset:true});
+  host.players.clear(); host.answers = new Map();
+  hostSync();
+}
 /* カードデータの受け渡し：主催者が許可したときだけ、ロビー中に join 済みの参加者へ、チャンクに分けて送る
    最後のチャンクまで送った参加者（pid）には、その部屋の間はもう送らない。送り始める回数は、pid ごとと部屋全体の両方に上限がある（中止した分も数える） */
-const DATA_COLS = ['id','name','reading','type','civ','cost','power','text','rarity','set','flavor','twin_id','aliases'];
+const DATA_COLS = ['id','name','reading','type','civ','cost','power','text','rarity','set','flavor','twin_id','aliases','race'];
 const DATA_CHUNK = 16000, DATA_MAX_CHUNK = 16384, DATA_MAX_N = 1000, DATA_MAX_TOTAL = 8000000, DATA_MAX_ROWS = 20000, DATA_MAX_FIELD = 10000;
 const DATA_MAX_SENDS = 3, DATA_ROOM_SENDS = 60, DATA_PID_STARTS = 3, DATA_BUF_MAX = 256 * 1024, DATA_STALL = 20000, DATA_SEND_MS = 120000;
 const DATA_TIMEOUT = 30000, DATA_RECV_MS = 300000;  // 参加者側：チャンクの間隔と、受信全体の締め切り
@@ -905,7 +1103,7 @@ let dataCache = null;
 function dataJSON(){
   if(!dataCache || dataCache.src !== cards){
     const rows = cards.map(c => ({id:c.id, name:c.name, reading:c.reading, type:c.type, civ:c.civ.join('/'), cost:String(c.cost), power:c.power == null ? '' : String(c.power),
-      text:c.text, rarity:c.rarity, set:c.set.join('/'), flavor:c.flavor, twin_id:c.twin_id, aliases:c.aliases.join('/')}));
+      text:c.text, rarity:c.rarity, set:c.set.join('/'), flavor:c.flavor, twin_id:c.twin_id, aliases:c.aliases.join('/'), race:c.race.join('/')}));
     dataCache = {src:cards, json:JSON.stringify(rows).replace(/[\uD800-\uDFFF]/g, ch => '\\u' + ch.charCodeAt(0).toString(16))};
   }
   return dataCache.json;
@@ -969,26 +1167,59 @@ function dataStatusText(){
 function hostDataShow(){ const el = $('#h-data'); if(el && host) el.textContent = dataStatusText(); }
 function hostOnClose(conn){
   const p = host.players.get(conn._pid);
-  if(p && p.conn === conn){ p.online = false; hostSyncSoon(); }
+  if(p && p.conn === conn){
+    p.online = false;
+    // ファイブボンバーで順番の人が切断したら、すぐ次の人へ
+    if(host.phase === 'question' && gameOf(host.cfg) === 'five' && host.turn && host.turn.order[host.turn.i] === p.pid){ fiveAdvance('切断のため飛ばしました'); return; }
+    hostSyncSoon();
+  }
 }
-function hostRanking(){ return rankRows([...host.players.values()].map(p => ({pid:p.pid, name:p.name, score:p.score, online:!!p.online}))); }
+// ドボンは、生き残った人を上に（その中は点数順）、失格した人は遅く落ちた順・点数順に並べる
+const dobonCmp = (a, b) => (a.out - b.out) || (a.out ? b.outAt - a.outAt : 0) || byScore(a, b);
+function hostRanking(){
+  const rows = [...host.players.values()].map(p => ({pid:p.pid, name:p.name, score:p.score, online:!!p.online, out:!!p.out, outAt:p.outAt || 0}));
+  return gameOf(host.cfg) === 'dobon' ? rankRows(rows, dobonCmp) : rankRows(rows);
+}
+// 優勝者：ドボンは生き残った全員（いなければ1位）。ほかの形式は1位
+function hostWinners(rk){
+  if(gameOf(host.cfg) === 'dobon'){ const alive = rk.filter(r => !r.out); if(alive.length) return alive; }
+  return rk.filter(r => r.rank === 1);
+}
+// ドボンの終わり：2人以上で始めたら生き残りが1人以下、1人で始めたらその人が失格
+function dobonOver(){
+  if(gameOf(host.cfg) !== 'dobon') return false;
+  const alive = [...host.players.values()].filter(p => !p.out).length;
+  return (host.startCount || 0) >= 2 ? alive <= 1 : alive === 0;
+}
+const hostIsLast = () => host.idx >= host.total || dobonOver() || !!host.themeOut;
 function stateFor(p, rk){
+  const game = gameOf(host.cfg), theme = THEME_GAMES.includes(game);
+  const inQ = host.phase === 'question' || host.phase === 'reveal', turn = game === 'five' && host.phase === 'question' && host.turn ? host.turn : null;
   const s = {
-    t:'state', phase:host.phase, idx:host.idx, total:host.total, mode:host.cfg.mode, time:host.cfg.time,
+    t:'state', phase:host.phase, game, idx:host.idx, total:host.total, mode:theme ? 'free' : host.cfg.mode, time:host.cfg.time,
     remain:host.phase === 'question' ? Math.max(0, host.endsAt - Date.now()) : 0,
-    q:(host.phase === 'question' || host.phase === 'reveal') ? host.pub : null,
+    remainNext:host.phase === 'reveal' && host.nextAt ? Math.min(NEXT_MS, Math.max(0, host.nextAt - Date.now())) : 0,
+    q:inQ && !theme ? host.pub : null,
+    theme:inQ && theme && host.q ? {text:host.q.theme.text} : null,
+    // ファイブボンバーの順番と、それまでの回答（全員に公開）
+    relay:turn ? {i:turn.i, turn:str((host.players.get(turn.order[turn.i]) || {}).name || '', 16), mine:turn.order[turn.i] === p.pid,
+      order:turn.order.slice(0, MAX_PLAYERS).map(id => str((host.players.get(id) || {}).name || '（退出）', 16)),
+      log:turn.log.slice(0, MAX_PLAYERS).map(r => cleanResult({...r, me:r.pid === p.pid}))} : null,
     answered:host.answers.size, online:[...host.players.values()].filter(x => x.online).length,
     share:!!(host.share && dataSource === 'csv' && host.phase === 'lobby'),
-    board:rk.map(r => ({name:r.name, score:r.score, rank:r.rank, online:r.online, me:r.pid === p.pid})),
-    me:{name:p.name, score:p.score, rank:(rk.find(r => r.pid === p.pid) || {}).rank || '-', answered:host.answers.has(p.pid), answerText:(host.answers.get(p.pid) || {}).text || ''}
+    board:rk.map(r => ({name:r.name, score:r.score, rank:r.rank, online:r.online, me:r.pid === p.pid, out:r.out})),
+    me:{name:p.name, score:p.score, rank:(rk.find(r => r.pid === p.pid) || {}).rank || '-', answered:host.answers.has(p.pid), answerText:(host.answers.get(p.pid) || {}).text || '', out:!!p.out}
   };
   if(host.phase === 'reveal'){
     const c = host.q.card, num = host.q.fmt === 'num';
     s.reveal = {
-      answer:num ? String(c[host.q.field]) : c.name,
-      sub:num ? `${c.name}の${host.q.field === 'cost' ? 'コスト' : 'パワー'}` : c.reading,
+      answer:theme ? host.q.theme.text : num ? String(c[host.q.field]) : c.name,
+      sub:theme ? '' : num ? `${c.name}の${host.q.field === 'cost' ? 'コスト' : 'パワー'}` : c.reading,
+      examples:theme ? (host.examples || []).slice(0, 10) : [], last:hostIsLast(),
       mine:host.results.find(r => r.pid === p.pid) || null,
-      top:host.results.slice(0, 5).map(r => ({name:r.name, g:r.g, pts:r.pts, input:r.input}))
+      // 全員分の結果（回答は締め切ったあとなので見せてよい）。ほかの参加者の pid は送らず、自分の行だけ me を付ける
+      results:host.results.slice(0, MAX_PLAYERS).map(r => cleanResult({name:r.name, g:r.g, pts:r.pts, input:r.input, msg:r.msg, me:r.pid === p.pid})),
+      card:theme ? null : cleanCard(c)
     };
     if(s.reveal.mine) s.reveal.mine = {g:s.reveal.mine.g, pts:s.reveal.mine.pts, input:s.reveal.mine.input, msg:s.reveal.mine.msg || ''};
   }
@@ -1007,42 +1238,147 @@ function hostSync(){
   if(tab === 'party') render();
 }
 function hostStart(){
-  const pools = partyPools();
-  if(!Object.keys(pools).length){ partyError = '出題できる問題がありません。クイズタブで形式や範囲を見直してください。'; render(); return; }
-  host.pools = pools; host.used = new Set(); host.idx = 0; host.total = host.cfg.count;
-  for(const p of host.players.values()) p.score = 0;
+  if(![...host.players.values()].some(p => p.online)){ partyError = '参加者がいないため開始できません。'; render(); return; }
+  const game = gameOf(host.cfg);
+  if(THEME_GAMES.includes(game)){
+    const range = rangeCards();
+    if(!range.length){ partyError = '出題範囲にカードがありません。クイズタブで範囲を見直してください。'; render(); return; }
+    host.range = range; host.rangeIds = new Set(range.map(c => c.id)); host.usedThemes = new Set();
+    host.nameIndex = new Map();  // 正規化した名前・読み・別名 → カード（お題の回答の照合用）
+    for(const c of cards) for(const k of c._keys){ const a = host.nameIndex.get(k); a ? a.push(c) : host.nameIndex.set(k, [c]); }
+  } else {
+    const pools = partyPools();
+    if(!Object.keys(pools).length){ partyError = '出題できる問題がありません。クイズタブで形式や範囲を見直してください。'; render(); return; }
+    host.pools = pools;
+  }
+  partyError = '';
+  hostStopNext();
+  host.used = new Set(); host.idx = 0; host.total = host.cfg.count; host.themeOut = false;
+  for(const p of host.players.values()){ p.score = 0; p.out = false; p.outAt = 0; }
+  host.startCount = [...host.players.values()].filter(p => p.online).length;
   hostNextQ();
 }
 function hostNextQ(){
+  const game = gameOf(host.cfg);
   host.idx++;
-  const q = makeQ(host.pools, host.used, host.cfg.mode, false);
-  host.q = q; host.pub = publicQ(q, quizCfg.customFields);
-  host.answers = new Map(); host.results = null;
+  host.answers = new Map(); host.results = null; host.turn = null;
+  if(THEME_GAMES.includes(game)){
+    const online = [...host.players.values()].filter(p => p.online);
+    const theme = makeTheme(host.range, Math.max(online.length * 3, 10), host.usedThemes);
+    if(!theme){
+      if(host.idx === 1){ host.idx = 0; host.phase = 'lobby'; host.share = false; partyError = '人数に対して答えが十分にあるお題を作れませんでした。出題範囲を広げてください。'; hostSync(); return; }
+      host.idx--; host.themeOut = true; host.phase = 'final'; partyError = 'これ以上お題を作れなかったため、大会を終えました。'; hostSync(); return;
+    }
+    host.usedThemes.add(theme.key);
+    host.q = {fmt:'theme', theme}; host.pub = null;
+    if(game === 'five'){
+      host.turn = {order:shuffle(online.map(p => p.pid)), i:-1, log:[], used:new Set()};
+      host.phase = 'question'; fiveAdvance(); return;
+    }
+  } else {
+    const q = makeQ(host.pools, host.used, host.cfg.mode, false);
+    host.q = q; host.pub = publicQ(q, quizCfg.customFields);
+  }
   host.startedAt = Date.now(); host.endsAt = host.startedAt + host.cfg.time * 1000;
   host.phase = 'question'; hostSync();
 }
+/* ファイブボンバー：順番の人が答えるか、時間切れ・切断で次の人へ（reason があれば今の人の行として残す）。全員の番が終わったら締め切る
+   順番が来た時点で切断している人・除外された人は飛ばす */
+function fiveAdvance(reason){
+  const t = host.turn; if(!t || host.phase !== 'question') return;
+  if(reason && t.i >= 0 && t.i < t.order.length){
+    const p = host.players.get(t.order[t.i]);
+    if(p){ host.answers.set(p.pid, {text:'', ms:0}); t.log.push({pid:p.pid, name:p.name, input:'', g:X, pts:0, msg:reason}); }
+  }
+  do t.i++; while(t.i < t.order.length && !(host.players.get(t.order[t.i]) || {}).online);
+  if(t.i >= t.order.length){ closeQuestion(); return; }
+  host.startedAt = Date.now(); host.endsAt = host.startedAt + host.cfg.time * 1000;
+  hostSync();
+}
+function fiveAnswer(p, a){
+  const t = host.turn, res = matchTheme(a.text, host.q.theme);
+  if(res.valid && t.used.has(res.card._norm)){ res.valid = false; res.g = X; res.msg = `「${res.card.name}」は既出`; }
+  const pts = res.valid ? partyPoints(host.cfg, res, a.ms, host.cfg.time * 1000) : 0;
+  if(res.valid) t.used.add(res.card._norm);
+  p.score += pts;
+  t.log.push({pid:p.pid, name:p.name, input:a.text, g:res.g, pts, msg:res.msg});
+  fiveAdvance();
+}
+// 制限時間が来たとき：ファイブボンバーは順番の人だけ時間切れにして次へ、ほかは締め切る
+function hostTimeUp(){ if(gameOf(host.cfg) === 'five') fiveAdvance('時間切れ'); else closeQuestion(); }
 function closeQuestion(){
   if(!host || host.phase !== 'question') return;
-  const q = host.q, dur = host.cfg.time * 1000;
-  host.results = [...host.players.values()].filter(p => p.online || host.answers.has(p.pid)).map(p => {
-    const a = host.answers.get(p.pid);
-    if(!a) return {pid:p.pid, name:p.name, input:'', g:X, pts:0, ms:Infinity, msg:'時間切れ'};
-    const res = judgeQ(q, a.text, host.cfg.mode, false);
-    let pts = BASE_PTS[res.g];
-    if(host.cfg.bonus && (res.g === '◎' || res.g === '○')) pts += Math.round(50 * Math.max(0, 1 - a.ms / dur));
-    p.score += pts;
-    return {pid:p.pid, name:p.name, input:a.text, g:res.g, pts, ms:a.ms, msg:res.msg || ''};
-  }).sort((a, b) => b.pts - a.pts || a.ms - b.ms);
-  host.phase = 'reveal'; hostSync();
+  const q = host.q, dur = host.cfg.time * 1000, game = gameOf(host.cfg);
+  if(game === 'five') host.results = host.turn ? host.turn.log.slice() : [];  // 点数は回答ごとに加えてある
+  else if(game === 'kabu') host.results = kabuResults(dur);
+  else {
+    // ドボンは、生き残っていた人全員（切断中も）が対象。✖︎・時間切れで失格にする
+    const dobon = game === 'dobon';
+    host.results = [...host.players.values()].filter(p => dobon ? !p.out : (p.online || host.answers.has(p.pid))).map(p => {
+      const a = host.answers.get(p.pid);
+      if(!a){ if(dobon){ p.out = true; p.outAt = host.idx; } return {pid:p.pid, name:p.name, input:'', g:X, pts:0, ms:Infinity, msg:dobon ? '時間切れ・失格' : '時間切れ'}; }
+      const res = judgeQ(q, a.text, host.cfg.mode, false);
+      const pts = partyPoints(host.cfg, res, a.ms, dur);
+      p.score += pts;
+      if(dobon && res.g === X){ p.out = true; p.outAt = host.idx; }
+      return {pid:p.pid, name:p.name, input:a.text, g:res.g, pts, ms:a.ms, msg:[res.msg, dobon && res.g === X ? '失格' : ''].filter(Boolean).join('・')};
+    }).sort((a, b) => b.pts - a.pts || a.ms - b.ms);
+  }
+  // お題の形式は、有効な回答の例（異なる名前を最大10件）を出す
+  if(THEME_GAMES.includes(game)) host.examples = shuffle([...new Set(host.range.filter(q.theme.test).map(c => c.name))]).slice(0, 10);
+  host.phase = 'reveal'; hostArmNext(NEXT_MS); hostSync();
 }
-function hostNext(){ if(host.idx >= host.total){ host.phase = 'final'; hostSync(); } else hostNextQ(); }
+// かぶっちゃやーよ：有効な回答のうち、ほかの人と同じカード（名前で比べる）を答えた人は全員0点
+function kabuResults(dur){
+  const rows = [...host.players.values()].filter(p => p.online || host.answers.has(p.pid)).map(p => {
+    const a = host.answers.get(p.pid);
+    if(!a) return {p, r:{pid:p.pid, name:p.name, input:'', g:X, pts:0, ms:Infinity, msg:'時間切れ'}};
+    const res = matchTheme(a.text, host.q.theme);
+    return {p, res, r:{pid:p.pid, name:p.name, input:a.text, g:res.g, pts:0, ms:a.ms, msg:res.msg}};
+  });
+  const count = new Map();
+  rows.forEach(x => { if(x.res && x.res.valid) count.set(x.res.card._norm, (count.get(x.res.card._norm) || 0) + 1); });
+  rows.forEach(x => {
+    if(!x.res || !x.res.valid) return;
+    const n = count.get(x.res.card._norm);
+    if(n > 1){ x.r.g = X; x.r.msg += `・被り（${n}人）`; return; }
+    x.r.pts = partyPoints(host.cfg, x.res, x.r.ms, dur); x.p.score += x.r.pts;
+  });
+  return rows.map(x => x.r).sort((a, b) => b.pts - a.pts || a.ms - b.ms);
+}
+// 1人の1問分の得点（大会の形式を増やすときは、host.cfg の値を見てここで分ける）
+function partyPoints(cfg, res, ms, dur){
+  let pts = BASE_PTS[res.g];
+  if(cfg.bonus && (res.g === '◎' || res.g === '○')) pts += Math.round(50 * Math.max(0, 1 - ms / dur));
+  return pts;
+}
+// 正解発表のカウントダウン。主催者のタブが裏にあっても setTimeout で進む（遅れることはある）
+function hostArmNext(ms){
+  clearTimeout(host.nextTimer);
+  const me = host, idx = host.idx;
+  host.nextAt = Date.now() + ms;
+  host.nextTimer = setTimeout(() => { if(host === me && me.phase === 'reveal' && me.idx === idx) hostNext(); }, ms);
+}
+function hostStopNext(){ if(host){ clearTimeout(host.nextTimer); host.nextTimer = 0; host.nextAt = 0; } }
+// 「次の問題」：すぐには進めず、残りが5秒より多ければ5秒にする
+function hostHurry(){
+  if(!host || host.phase !== 'reveal' || !host.nextAt) return;
+  if(host.nextAt - Date.now() > NEXT_SHORT_MS){ hostArmNext(NEXT_SHORT_MS); hostSync(); }
+}
+function hostNext(){ hostStopNext(); if(hostIsLast()){ host.phase = 'final'; hostSync(); } else hostNextQ(); }
 function closeRoom(){
   if(!host) return;
   for(const p of host.players.values()){ if(p.conn && p.conn.open){ try{ p.conn.send({t:'closed'}); }catch(e){} } }
+  hostStopNext();
   const peer = host.peer; host = null;
   setTimeout(() => { try{ peer.destroy(); }catch(e){} }, 300);
   render();
 }
+// 結果の一覧（主催者の画面と、参加者が受け取った全員分の結果で共通。参加者側の値は cleanResult 済み）
+function resultsHTML(list){
+  return `<ul class="reslist">${list.length ? list.map(r => { const G = own(GRADE, r.g) || GRADE[X]; return `<li class="${r.me ? 'me' : ''}"><span class="rg ${G.cls}">${esc(r.g)}</span><span>${esc(r.name)}${r.me ? '（あなた）' : ''}<small>${r.input ? esc(r.input) : '（回答なし）'}${r.msg ? `　${esc(r.msg)}` : ''}</small></span><span class="rp">+${esc(r.pts)}</span></li>`; }).join('') : '<li><span></span><span>回答者がいません</span><span></span></li>'}</ul>`;
+}
+const kickBtn = p => `<button class="kick" data-act="host-kick" data-pid="${esc(p.pid)}" aria-label="${esc(p.name)}を除外">除外</button>`;
 function hostHTML(){
   const h = host;
   if(h.phase === 'opening') return waitingHTML('部屋を準備しています…');
@@ -1059,8 +1395,10 @@ function hostHTML(){
       <p><button class="btn" data-act="copy-url">参加URLをコピー</button></p>
     </div>
     <h3>参加者 ${online.length}人</h3>
-    <div class="plist">${players.length ? players.map(p => `<span class="pchip ${p.online ? '' : 'off'}">${esc(p.name)}</span>`).join('') : '<span class="note">まだ誰も参加していません</span>'}</div>
-    <details class="panel" style="margin-bottom:16px"><summary style="cursor:pointer;font-weight:700">大会の設定（${h.cfg.count}問・1問${h.cfg.time}秒・${h.cfg.mode === 'choice' ? '4択' : '自由入力'}）</summary><div style="margin-top:12px">${partyCfgHTML(h.cfg)}</div></details>
+    <div class="plist">${players.length ? players.map(p => `<span class="pchip ${p.online ? '' : 'off'}">${esc(p.name)}${kickBtn(p)}</span>`).join('') : '<span class="note">まだ誰も参加していません</span>'}</div>
+    ${players.length ? '<p><button class="btn" data-act="host-reset">メンバーをリセット</button></p>' : ''}
+    ${ruleHTML(gameOf(h.cfg))}
+    <details class="panel" style="margin-bottom:16px"><summary style="cursor:pointer;font-weight:700">大会の設定（${esc(GAMES[gameOf(h.cfg)].label)}・${h.cfg.count}問・1問${h.cfg.time}秒・${THEME_GAMES.includes(gameOf(h.cfg)) || h.cfg.mode !== 'choice' ? '自由入力' : '4択'}）</summary><div style="margin-top:12px">${partyCfgHTML(h.cfg)}</div></details>
     <div class="panel" style="margin-bottom:16px">
       <label class="check" style="border-top:0;padding-top:0"><input type="checkbox" data-pshare ${h.share && dataSource === 'csv' ? 'checked' : ''} ${dataSource === 'csv' ? '' : 'disabled'}>参加者にカードデータを渡す</label>
       <p class="note" style="margin:0">${dataSource === 'csv' ? 'オンにすると、ロビーにいる参加者が「カードデータを受け取る」を押したときに、この端末のカードデータを端末間の通信で直接送ります。受け取ったデータは参加者のブラウザに保存されます。' : 'いまはサンプルデータなので渡せません。データタブでCSVを読み込むと選べます。'}</p>
@@ -1068,28 +1406,50 @@ function hostHTML(){
       <p class="note" style="margin:0">送り始める回数は、1人${DATA_PID_STARTS}回・部屋全体で${DATA_ROOM_SENDS}回までです（中止した分も数えます）。<button class="btn ghost" data-act="host-data-reset" style="min-height:32px">回数をリセット</button></p>
     </div>
     <button class="btn primary big" data-act="host-start" ${online.length ? '' : 'disabled'}>${online.length ? `${online.length}人で開始する` : '参加者を待っています'}</button>`;
-  if(h.phase === 'question') return `${head}
-    <div class="qbar"><span><b>第${h.idx}問 / ${h.total}</b>　${FMT_LABEL[h.q.fmt]}</span><span>回答 <b>${h.answers.size}</b> / ${online.length}</span></div>
-    ${timerHTML('h-timer')}
-    <div class="clue big">${clueHTML(h.pub)}${h.cfg.mode === 'choice' ? `<ol style="margin:14px 0 0;padding-left:1.4em;font-size:18px">${h.pub.choices.map(c => `<li>${esc(c)}</li>`).join('')}</ol>` : ''}</div>
-    <div class="plist">${online.map(p => `<span class="pchip ${h.answers.has(p.pid) ? 'done' : ''}">${esc(p.name)}${h.answers.has(p.pid) ? ' ✓' : ''}</span>`).join('')}</div>
-    <button class="btn big" data-act="host-close-q">締め切る</button>`;
-  if(h.phase === 'reveal'){
-    const c = h.q.card, num = h.q.fmt === 'num';
+  const game = gameOf(h.cfg), theme = THEME_GAMES.includes(game);
+  if(h.phase === 'question'){
+    const wait = online.filter(p => !(game === 'dobon' && p.out)), t = h.turn;
+    const clue = `<div class="clue big">${theme ? themeClueHTML(h.q.theme) : clueHTML(h.pub)}${!theme && h.cfg.mode === 'choice' ? `<ol style="margin:14px 0 0;padding-left:1.4em;font-size:18px">${h.pub.choices.map(c => `<li>${esc(c)}</li>`).join('')}</ol>` : ''}</div>`;
+    if(t) return `${head}
+    <div class="qbar"><span><b>第${h.idx}問 / ${h.total}</b>　${esc(GAMES[game].label)}</span><span>${esc(t.i + 1)} / ${esc(t.order.length)}人目</span></div>
+    ${clue}
+    <p class="nextcount">${esc((h.players.get(t.order[t.i]) || {}).name || '')}さんの番</p>${timerHTML('h-timer')}
+    <h3>これまでの回答</h3>${resultsHTML(t.log)}
+    <div class="plist">${online.map(p => `<span class="pchip ${p.pid === t.order[t.i] ? 'done' : ''}">${esc(p.name)}${kickBtn(p)}</span>`).join('')}</div>
+    <button class="btn big" data-act="host-close-q">このお題を締め切る</button>`;
     return `${head}
-    <div class="qbar"><span><b>第${h.idx}問 / ${h.total}</b>　${FMT_LABEL[h.q.fmt]}</span></div>
-    <div class="correct-big"><div class="k">正解</div><div class="v">${esc(num ? c[h.q.field] : c.name)}</div><small>${esc(num ? `${c.name}の${h.q.field === 'cost' ? 'コスト' : 'パワー'}` : c.reading)}</small></div>
+    <div class="qbar"><span><b>第${h.idx}問 / ${h.total}</b>　${esc(theme || game === 'dobon' ? GAMES[game].label : FMT_LABEL[h.q.fmt])}</span><span>回答 <b>${h.answers.size}</b> / ${wait.length}</span></div>
+    ${timerHTML('h-timer')}
+    ${clue}
+    <div class="plist">${online.map(p => `<span class="pchip ${h.answers.has(p.pid) ? 'done' : ''} ${game === 'dobon' && p.out ? 'off' : ''}">${esc(p.name)}${h.answers.has(p.pid) ? ' ✓' : ''}${game === 'dobon' && p.out ? '（失格）' : ''}${kickBtn(p)}</span>`).join('')}</div>
+    <button class="btn big" data-act="host-close-q">締め切る</button>`;
+  }
+  if(h.phase === 'reveal'){
+    const c = h.q.card, num = h.q.fmt === 'num', last = hostIsLast();
+    const big = theme
+      ? `<div class="correct-big"><div class="k">お題</div><div class="v">${esc(h.q.theme.text)}</div></div><p class="note" style="text-align:center">有効な回答の例：${esc((h.examples || []).join('、'))}</p>`
+      : `<div class="correct-big"><div class="k">正解</div><div class="v">${esc(num ? c[h.q.field] : c.name)}</div><small>${esc(num ? `${c.name}の${h.q.field === 'cost' ? 'コスト' : 'パワー'}` : c.reading)}</small></div>`;
+    return `${head}
+    <div class="qbar"><span><b>第${h.idx}問 / ${h.total}</b>　${esc(theme || game === 'dobon' ? GAMES[game].label : FMT_LABEL[h.q.fmt])}</span></div>
+    ${big}
+    ${nextCountHTML('h-next', h.nextAt - Date.now(), last)}
+    <div class="row" style="margin-bottom:16px"><button class="btn primary big" data-act="host-next">${last ? '最終結果を見る' : '次の問題'}</button>${theme ? '' : `<button class="btn" data-act="detail" data-id="${esc(c.id)}">カードを見る</button>`}</div>
+    <p class="note" style="margin-top:-8px">押すと、残りが5秒より多いときは5秒にします。</p>
     <h3>この問題の結果</h3>
-    <ul class="reslist">${h.results.length ? h.results.map(r => `<li><span class="rg ${GRADE[r.g].cls}">${r.g}</span><span>${esc(r.name)}<small>${r.input ? esc(r.input) : esc(r.msg || '回答なし')}</small></span><span class="rp">+${r.pts}</span></li>`).join('') : '<li><span></span><span>回答者がいません</span><span></span></li>'}</ul>
-    <h3>現在の順位</h3>${boardHTML(hostRanking(), 10)}
-    <div class="row"><button class="btn primary big" data-act="host-next">${h.idx >= h.total ? '最終結果を見る' : '次の問題'}</button><button class="btn" data-act="detail" data-id="${esc(c.id)}">カードを見る</button></div>`;
+    ${resultsHTML(h.results)}
+    <h3>現在の順位</h3>${boardHTML(hostRanking())}
+    <details class="panel" id="kickpick" style="margin-bottom:16px" ${kickPickOpen ? 'open' : ''}><summary style="cursor:pointer;font-weight:700">参加者を除外する</summary><div class="plist" style="margin:12px 0 0">${players.map(p => `<span class="pchip ${p.online ? '' : 'off'}">${esc(p.name)}${kickBtn(p)}</span>`).join('') || '<span class="note">参加者がいません</span>'}</div></details>`;
   }
   const rk = hostRanking();
   return `${head}
     <h2>最終結果</h2>
-    ${rk.length ? `<div class="correct-big"><div class="k">優勝</div><div class="v">${esc(rk.filter(r => r.rank === 1).map(r => r.name).join('、'))}</div><small>${rk[0].score}点</small></div>` : ''}
+    ${partyError ? `<p class="ng">${esc(partyError)}</p>` : ''}${ruleHTML(game)}
+    ${rk.length ? `<div class="correct-big"><div class="k">優勝</div><div class="v">${esc(hostWinners(rk).map(r => r.name).join('、'))}</div><small>${game === 'dobon' && !rk[0].out ? '生き残り' : `${esc(rk[0].score)}点`}</small></div>` : ''}
     ${boardHTML(rk)}
-    <div class="row"><button class="btn primary" data-act="host-start">同じメンバーでもう一度</button><button class="btn" data-act="host-back">ロビーに戻る</button></div>`;
+    <div class="row"><button class="btn primary" data-act="host-start" ${online.length ? '' : 'disabled'}>同じメンバーでもう一度</button><button class="btn" data-act="host-back">ロビーに戻る</button></div>
+    <h3 style="margin-top:20px">参加者</h3>
+    <div class="plist">${players.length ? players.map(p => `<span class="pchip ${p.online ? '' : 'off'}">${esc(p.name)}${kickBtn(p)}</span>`).join('') : '<span class="note">参加者がいません</span>'}</div>
+    ${players.length ? '<p><button class="btn" data-act="host-reset">メンバーをリセット</button></p>' : ''}`;
 }
 
 /* --- 参加者 --- */
@@ -1106,7 +1466,7 @@ function joinRoom(code, name){
   render();
   if(typeof Peer === 'undefined'){ player.status = 'error'; player.err = '通信用の部品を読み込めませんでした。ネットワークを確認して、ページを開き直してください。'; render(); return; }
   const peer = new Peer({debug:0}); player.peer = peer;
-  const fail = msg => { if(player !== me || me.status === 'ended') return; me.status = 'error'; me.err = msg; render(); };
+  const fail = msg => { if(player !== me || STOPPED.includes(me.status)) return; me.status = 'error'; me.err = msg; render(); };
   setTimeout(() => { if(player === me && me.status === 'connecting') fail('時間内につながりませんでした。コードを確認して、もう一度試してください。'); }, 15000);
   peer.on('open', () => {
     if(player !== me) return;
@@ -1114,10 +1474,12 @@ function joinRoom(code, name){
     me.conn = conn;
     conn.on('open', () => { if(player !== me) return; conn.send({t:'join', pid:me.pid, name:me.name}); me.status = 'joined'; render(); });
     conn.on('data', m => { if(player === me) playerOnData(m); });
-    conn.on('close', () => { if(player === me && me.conn === conn && me.status !== 'ended'){ me.status = 'closed'; render(); } });
+    conn.on('close', () => { if(player === me && me.conn === conn && !STOPPED.includes(me.status)){ me.status = 'closed'; render(); } });
   });
   peer.on('error', err => fail(peerErrText(err)));
 }
+// 主催者が部屋を閉じた（ended）・除外した（kicked）・メンバーをリセットした（reset）あとは、切断やエラーで状態を上書きしない
+const STOPPED = ['ended', 'kicked', 'reset'];
 /* 主催者から届く状態は信用せず、使う項目だけを型と長さをそろえて取り出す */
 const PHASES = ['lobby', 'question', 'reveal', 'final'];
 const isObj = v => !!v && typeof v === 'object';
@@ -1133,31 +1495,48 @@ function cleanQ(q){
     name:str(q.name, 200), type:str(q.type, 50)
   };
 }
+// ファイブボンバーの順番と回答の一覧（人数・長さを制限する）
+const cleanRelay = r => isObj(r) ? {i:fin(r.i), turn:str(r.turn, 16), mine:r.mine === true, order:strList(r.order, MAX_PLAYERS, 16),
+  log:Array.isArray(r.log) ? r.log.slice(0, MAX_PLAYERS).filter(isObj).map(cleanResult) : []} : null;
 function cleanState(m){
   if(!PHASES.includes(m.phase)) return null;
   const me = isObj(m.me) ? m.me : {}, r = isObj(m.reveal) ? m.reveal : null, mine = r && isObj(r.mine) ? r.mine : null;
   const time = Math.min(Math.max(0, fin(m.time)), 600);
   return {
-    t:'state', phase:m.phase, idx:fin(m.idx), total:fin(m.total), mode:m.mode === 'choice' ? 'choice' : 'free', time,
-    remain:Math.min(Math.max(0, fin(m.remain)), time * 1000), q:cleanQ(m.q), answered:fin(m.answered), online:fin(m.online), share:m.share === true,
-    board:Array.isArray(m.board) ? m.board.slice(0, 30).filter(isObj).map(x => ({name:str(x.name, 16), score:fin(x.score), rank:rankOf(x.rank), online:x.online === true, me:x.me === true})) : [],
-    me:{name:str(me.name, 16), score:fin(me.score), rank:rankOf(me.rank), answered:me.answered === true, answerText:str(me.answerText, MAX_ANSWER)},
-    reveal:r ? {answer:str(r.answer, 200), sub:str(r.sub, 200), mine:mine ? {g:str(mine.g, 4), pts:fin(mine.pts), input:str(mine.input, MAX_ANSWER), msg:str(mine.msg, 200)} : null} : null
+    t:'state', phase:m.phase, game:own(GAMES, m.game) ? m.game : 'normal', idx:fin(m.idx), total:fin(m.total), mode:m.mode === 'choice' ? 'choice' : 'free', time,
+    remain:Math.min(Math.max(0, fin(m.remain)), time * 1000), remainNext:Math.min(Math.max(0, fin(m.remainNext)), NEXT_MS), q:cleanQ(m.q), theme:isObj(m.theme) ? {text:str(m.theme.text, 100)} : null, relay:cleanRelay(m.relay), answered:fin(m.answered), online:fin(m.online), share:m.share === true,
+    board:Array.isArray(m.board) ? m.board.slice(0, 30).filter(isObj).map(x => ({name:str(x.name, 16), score:fin(x.score), rank:rankOf(x.rank), online:x.online === true, me:x.me === true, out:x.out === true})) : [],
+    me:{name:str(me.name, 16), score:fin(me.score), rank:rankOf(me.rank), answered:me.answered === true, answerText:str(me.answerText, MAX_ANSWER), out:me.out === true},
+    reveal:r ? {answer:str(r.answer, 200), sub:str(r.sub, 200), examples:strList(r.examples, 10, 200), last:r.last === true, mine:mine ? {g:str(mine.g, 4), pts:fin(mine.pts), input:str(mine.input, MAX_ANSWER), msg:str(mine.msg, 200)} : null,
+      results:Array.isArray(r.results) ? r.results.slice(0, MAX_PLAYERS).filter(isObj).map(cleanResult) : [], card:cleanCard(r.card)} : null
   };
 }
 function playerOnData(m){
   if(!m || typeof m !== 'object') return;
+  if(player.status === 'kicked' || player.status === 'reset') return;  // 除外・リセットのあとは何も受け取らない（ended は、閉じたあとの最後の state を表示に使うので STOPPED とは分ける）
   if(m.t === 'closed'){ player.status = 'ended'; render(); return; }
+  if(m.t === 'kicked'){  // 主催者との接続から届いたときだけ（この関数は主催者との接続の data からだけ呼ばれる）。自動ではつなぎ直さない
+    player.status = m.reset === true ? 'reset' : 'kicked';
+    if(player.dl) dlStop(player.dl);
+    if(player.cardOpen != null){ player.cardOpen = null; closeDetail(); }
+    try{ player.peer.destroy(); }catch(e){}
+    render(); return;
+  }
   if(m.t === 'error'){ player.status = 'error'; player.err = str(m.msg, 200) || 'エラーが起きました'; render(); return; }
   if(m.t === 'data-chunk' || m.t === 'data-busy' || m.t === 'data-abort'){ playerOnDataMsg(m); return; }
   if(m.t !== 'state') return;
   m = cleanState(m); if(!m) return;
   player.state = m;
   if(m.phase === 'question') player.deadline = Date.now() + Number(m.remain || 0);
-  const key = `${player.status}|${m.phase}|${m.idx}|${m.me && m.me.answered}|${m.share}`;
+  player.nextDeadline = m.phase === 'reveal' ? Date.now() + m.remainNext : null;
+  if(player.cardOpen != null && (m.phase !== 'reveal' || m.idx !== player.cardOpen)){ player.cardOpen = null; closeDetail(); }  // 次の問題に移ったら正解カードの表示を閉じる
+  const key = playerKey(m);
   if(tab !== 'party') return;
   if(key === player.lastKey && $('#p-live')){ $('#p-live').innerHTML = playerLiveHTML(); return; }
+  // 描き直しても、入力中の回答は残す
+  const inp = $('#p-answer'), keep = inp ? inp.value : '';
   render();
+  if(keep && $('#p-answer')) $('#p-answer').value = keep;
 }
 function leaveRoom(){ if(player && player.peer){ try{ player.peer.destroy(); }catch(e){} } if(player && player.dl) dlStop(player.dl); player = null; render(); }
 
@@ -1242,6 +1621,8 @@ function dlHTML(){
     ${d.errs.length ? `<p class="note"><span class="ng">${esc(d.errs.length)}件</span>は取り込めませんでした。</p><ul class="errlist">${d.errs.slice(0, 20).map(e => `<li>${esc(e.line)}行目 ${esc(e.name)}：${esc(e.problems.join('、'))}</li>`).join('')}</ul>` : ''}
     <p style="margin-top:8px"><a class="btn" href="${esc(location.pathname)}" target="_blank" rel="noopener">一人用クイズを開く（別のタブ）</a></p>`;
 }
+// これが変わらない更新は、#p-live だけを書き換える（ファイブボンバーは順番・回答の一覧が変わるので毎回描き直す）
+const playerKey = s => `${player.status}|${s.phase}|${s.idx}|${s.me && s.me.answered}|${s.share}|${s.me && s.me.out}|${s.relay ? s.relay.i + '/' + (Array.isArray(s.relay.log) ? s.relay.log.length : 0) : ''}`;
 function playerLiveHTML(){
   const s = player.state;
   if(s.phase === 'lobby') return `<h3>参加者 ${esc(s.online)}人</h3><div class="plist">${s.board.map(r => `<span class="pchip ${r.online ? '' : 'off'}">${esc(r.name)}</span>`).join('')}</div>`;
@@ -1254,32 +1635,59 @@ function playerHTML(){
   if(P.status === 'connecting') return waitingHTML(`部屋「${esc(P.code)}」につないでいます…`);
   if(P.status === 'error') return `<p class="ng">${esc(P.err)}</p><div class="row"><button class="btn primary" data-act="rejoin">もう一度つなぐ</button>${leave}</div>`;
   if(P.status === 'closed') return `${waitingHTML('主催者との接続が切れました。点数は主催者側に残っているので、つなぎ直せば続きから参加できます。')}<div class="row"><button class="btn primary" data-act="rejoin">つなぎ直す</button>${leave}</div>`;
+  if(P.status === 'kicked') return `${waitingHTML('主催者によって退出させられました。')}<div class="row"><button class="btn" data-act="leave">戻る</button></div>`;
+  if(P.status === 'reset') return `${waitingHTML('主催者が参加者をリセットしました。もう一度参加してください。')}<div class="row"><button class="btn primary" data-act="rejoin">もう一度参加する</button>${leave}</div>`;
   if(P.status === 'ended') return `${waitingHTML('主催者が部屋を閉じました。おつかれさまでした！')}${P.state && P.state.board ? boardHTML(P.state.board) : ''}${leave}`;
   const s = P.state;
   if(!s) return waitingHTML('主催者からの応答を待っています…');
   const top = `<div class="qbar"><span><b>${esc(s.me.name)}</b>　${esc(s.me.score)}点・${esc(s.me.rank)}位</span>${leave}</div>`;
-  if(s.phase === 'lobby') return `${top}${waitingHTML('参加しました。主催者が始めるのを待っています。')}<div id="p-dl" style="margin-bottom:16px">${dlHTML()}</div><div id="p-live">${playerLiveHTML()}</div>`;
+  if(s.phase === 'lobby') return `${top}${ruleHTML(s.game)}${waitingHTML('参加しました。主催者が始めるのを待っています。')}<div id="p-dl" style="margin-bottom:16px">${dlHTML()}</div><div id="p-live">${playerLiveHTML()}</div>`;
   if(s.phase === 'question'){
-    const q = s.q || {};
+    const q = s.q || {}, relay = s.relay;
     const isNum = q.fmt === 'num';
+    const box = `<div class="answerbox"><label for="p-answer" class="visually-hidden">回答</label><input id="p-answer" type="${isNum ? 'text' : 'search'}" ${isNum ? 'inputmode="numeric"' : ''} autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${isNum ? '数字で入力' : 'カード名を入力'}"><button class="btn primary" data-act="p-submit">回答</button></div>`;
+    const head = `<div class="qbar"><span><b>第${esc(s.idx)}問 / ${esc(s.total)}</b>　${esc(s.theme ? gameInfo(s.game).label : own(FMT_LABEL, q.fmt) || '')}</span>${relay ? '' : `<span id="p-live">${playerLiveHTML()}</span>`}</div>`;
+    const clue = `<div class="clue">${s.theme ? themeClueHTML(s.theme) : clueHTML(q)}</div>`;
+    if(s.game === 'dobon' && s.me.out) return `${top}${head}${clue}${waitingHTML('失格（観戦中）')}`;
+    if(relay){
+      const mine = relay.mine && !s.me.answered;
+      return `${top}${head}${clue}
+        <p class="nextcount">${mine ? '<b>あなた</b>の番です' : `${esc(relay.turn)}さんの番`}</p>${timerHTML('p-timer')}
+        ${mine ? box : ''}
+        <h3>これまでの回答</h3>${resultsHTML(relay.log)}
+        <p class="note">順番：${esc(relay.order.join(' → '))}</p>`;
+    }
     const answer = s.me.answered
       ? waitingHTML(`回答しました：「${esc(s.me.answerText) || '（空欄）'}」<br>締め切りを待っています`)
       : s.mode === 'choice' && Array.isArray(q.choices)
         ? `<div class="choices">${q.choices.map((v, i) => `<button class="btn" data-act="p-choose" data-i="${i}">${esc(v)}</button>`).join('')}</div>`
-        : `<div class="answerbox"><label for="p-answer" class="visually-hidden">回答</label><input id="p-answer" type="${isNum ? 'text' : 'search'}" ${isNum ? 'inputmode="numeric"' : ''} autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${isNum ? '数字で入力' : 'カード名を入力'}"><button class="btn primary" data-act="p-submit">回答</button></div>`;
-    return `${top}<div class="qbar"><span><b>第${esc(s.idx)}問 / ${esc(s.total)}</b>　${esc(own(FMT_LABEL, q.fmt) || '')}</span><span id="p-live">${playerLiveHTML()}</span></div>${timerHTML('p-timer')}<div class="clue">${clueHTML(q)}</div>${answer}`;
+        : box;
+    return `${top}${head}${timerHTML('p-timer')}${clue}${answer}`;
   }
   if(s.phase === 'reveal'){
     const r = s.reveal || {}, mine = r.mine, G = mine ? own(GRADE, mine.g) || GRADE[X] : null;
     return `${top}
       ${mine ? `<div class="result"><div class="stamp ${G.cls}" aria-hidden="true">${esc(mine.g)}</div><p class="verdict ${G.cls}">${G.label}</p><p class="pts">+${esc(mine.pts)}点</p>${mine.msg ? `<p class="msg">${esc(mine.msg)}</p>` : ''}</div>` : waitingHTML('この問題には参加していません')}
-      <div class="correct-big"><div class="k">正解</div><div class="v">${esc(r.answer)}</div><small>${esc(r.sub)}</small></div>
+      <div class="correct-big"><div class="k">${s.theme ? 'お題' : '正解'}</div><div class="v">${esc(r.answer)}</div><small>${esc(r.sub)}</small></div>
+      ${Array.isArray(r.examples) && r.examples.length ? `<p class="note" style="text-align:center">有効な回答の例：${esc(r.examples.join('、'))}</p>` : ''}
       ${mine && mine.input ? `<p class="note" style="text-align:center">あなたの回答：${esc(mine.input)}</p>` : ''}
-      <h3>現在の順位</h3>${boardHTML(s.board, 10)}
-      ${waitingHTML('次の問題を待っています')}`;
+      ${s.game === 'dobon' && s.me.out ? '<p class="ng" style="text-align:center">失格（観戦中）</p>' : ''}
+      ${r.card ? '<p style="text-align:center"><button class="btn" data-act="p-card">カードを見る</button></p>' : ''}
+      ${nextCountHTML('p-next', playerNextRemain(s), r.last)}
+      <h3>この問題の結果</h3>${resultsHTML(Array.isArray(r.results) ? r.results : [])}
+      <h3>現在の順位</h3>${boardHTML(s.board)}`;
   }
   const meRow = s.board.find(r => r.me);
-  return `${top}<h2>最終結果</h2>${meRow ? `<div class="correct-big"><div class="k">あなたの順位</div><div class="v">${esc(meRow.rank)}位</div><small>${esc(meRow.score)}点</small></div>` : ''}${boardHTML(s.board)}${waitingHTML('主催者が次の大会を始めると、ここに出題されます')}`;
+  return `${top}<h2>最終結果</h2>${ruleHTML(s.game)}${meRow ? `<div class="correct-big"><div class="k">あなたの順位</div><div class="v">${esc(meRow.rank)}位</div><small>${esc(meRow.score)}点</small></div>` : ''}${boardHTML(s.board)}${waitingHTML('主催者が次の大会を始めると、ここに出題されます')}`;
+}
+// 次の問題までの残り（受け取った時刻からローカルの時計で減らす。まだ受け取っていない描画では送られた値のまま）
+const playerNextRemain = s => player.nextDeadline != null ? player.nextDeadline - Date.now() : s.remainNext;
+// 正解発表で送られてきた正解カードの公開情報を表示する（この端末のカードデータは使わない。値は cleanCard 済みで、表示は esc する）
+function playerCardDetail(){
+  const s = player && player.state, c = s && s.phase === 'reveal' && s.reveal && s.reveal.card;
+  if(!c) return;
+  player.cardOpen = s.idx;
+  showSheet(`${cardBodyHTML(c)}<p class="note">主催者のカードデータの内容です。</p>`);
 }
 function playerSubmit(text){
   const P = player; if(!P || !P.conn || !P.conn.open || !P.state || P.state.phase !== 'question') return;
@@ -1290,7 +1698,10 @@ function playerSubmit(text){
 /* --- 大会タブの入口 --- */
 function partyCfgHTML(cfg){
   const seg = (k, items) => `<div class="seg">${items.map(([v, l]) => `<button class="${cfg[k] === v ? 'on' : ''}" data-act="pcfg" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
-  return `<div class="grid2" style="margin-bottom:12px">
+  const g = gameOf(cfg);
+  return `<div style="margin-bottom:12px"><h3>大会の形式</h3><div class="seg" style="grid-auto-flow:row;grid-template-columns:1fr 1fr">${Object.entries(GAMES).map(([k, x]) => `<button class="${g === k ? 'on' : ''}" data-act="pcfg" data-k="game" data-v="${k}">${esc(x.label)}</button>`).join('')}</div>
+      <p class="note">${esc(GAMES[g].rule)}${THEME_GAMES.includes(g) ? 'お題はクイズタブの出題範囲から作り、回答方式は自由入力だけです。' : ''}${g === 'five' ? '制限時間は1人の持ち時間です。' : ''}</p></div>
+    <div class="grid2" style="margin-bottom:12px">
       <div><h3>問題数</h3>${seg('count', [[5,'5問'],[10,'10問'],[20,'20問']])}</div>
       <div><h3>制限時間</h3>${seg('time', [[15,'15秒'],[30,'30秒'],[60,'60秒']])}</div>
       <div><h3>回答方式</h3>${seg('mode', [['free','自由入力'],['choice','4択']])}</div>
@@ -1302,7 +1713,9 @@ function partySetupHTML(){
   const range = rangeCards();
   const total = new Set(quizCfg.formats.flatMap(f => eligible(f, range).map(c => c.id))).size;
   const fmtNames = quizCfg.formats.map(f => FMT_LABEL[f]).join('、') || '未選択';
-  const rangeText = searchRange ? `検索結果の${searchRange.size}枚` : [quizCfg.civs.length ? quizCfg.civs.join('・') : '全文明', quizCfg.set || '全収録弾'].join('、');
+  const chosen = quizCfg.sets.filter(x => x !== SETS_NONE);
+  const setText = !quizCfg.sets.length ? '全収録弾' : !chosen.length ? '収録弾の選択なし' : chosen.length <= 3 ? chosen.join('・') : `収録弾${chosen.length}つ`;
+  const rangeText = searchRange ? `検索結果の${searchRange.size}枚` : [quizCfg.civs.length ? quizCfg.civs.join('・') : '全文明', setText].join('、');
   const join = `<section class="block panel"><h3>部屋に参加する</h3>
       <div class="grid2"><label class="field">部屋コード<input type="text" id="j-code" maxlength="5" autocapitalize="characters" autocomplete="off" value="${esc(roomParam)}" placeholder="例：K7PQ2"></label><label class="field">表示名<input type="text" id="j-name" maxlength="16" autocomplete="nickname" value="${esc(savedName())}" placeholder="例：たろう"></label></div>
       <button class="btn primary" data-act="join" style="margin-top:12px;width:100%">参加する</button></section>`;
@@ -1313,7 +1726,7 @@ function partySetupHTML(){
   <section class="block panel"><h3>部屋を作る（主催者）</h3>
     <p style="font-size:14px">出題形式：${esc(fmtNames)}<br>出題範囲：${esc(rangeText)}（${total}枚）　<button class="btn ghost" data-act="goto-quiz" style="min-height:32px">クイズタブで変更</button></p>
     ${partyCfgHTML(partyCfg)}
-    <button class="btn primary big" data-act="host-create" ${total ? '' : 'disabled'}>部屋を作る</button>
+    <button class="btn primary big" data-act="host-create" ${total || (THEME_GAMES.includes(partyCfg.game) && range.length) ? '' : 'disabled'}>部屋を作る</button>
   </section>
   ${join}`;
 }
@@ -1326,7 +1739,7 @@ function afterPartyRender(){
   }
   if(player && player.state){
     const s = player.state;
-    player.lastKey = `${player.status}|${s.phase}|${s.idx}|${s.me && s.me.answered}|${s.share}`;
+    player.lastKey = playerKey(s);
     const i = $('#p-answer'); if(i) i.focus({preventScroll:true});
   } else if(player) player.lastKey = '';
 }
@@ -1334,10 +1747,17 @@ setInterval(() => {
   if(host && host.phase === 'question'){
     const rem = host.endsAt - Date.now();
     updTimer('#h-timer', rem, host.cfg.time * 1000);
-    if(rem <= 0) closeQuestion();
+    if(rem <= 0) hostTimeUp();
   }
   if(player && player.state && player.state.phase === 'question') updTimer('#p-timer', player.deadline - Date.now(), player.state.time * 1000);
+  tickNext();
 }, 200);
+// 正解発表のカウントダウン表示を今の残りに合わせる（主催者は host.nextAt、参加者は受け取った remainNext から）
+function tickNext(){
+  if(host && host.phase === 'reveal' && host.nextAt) updNext('#h-next', host.nextAt - Date.now());
+  else if(!host && player && player.status === 'joined' && player.state && player.state.phase === 'reveal' && player.nextDeadline != null) updNext('#p-next', player.nextDeadline - Date.now());
+  else updNext(null, null);
+}
 window.addEventListener('beforeunload', e => { if(host && host.players.size){ e.preventDefault(); e.returnValue = ''; } });
 
 /* ===== 描画とイベント ===== */
@@ -1350,8 +1770,16 @@ function render(){
   else m.innerHTML = dataHTML();
   if(tab === 'quiz' && quizView === 'question'){ const i = $('#answer'); if(i) i.focus({preventScroll:true}); }
   if(tab === 'quiz' && quizView === 'result'){ const b = $('#nextbtn'); if(b) b.focus({preventScroll:true}); }
+  tickNext();
 }
 function toggle(arr, v){ const i = arr.indexOf(v); i >= 0 ? arr.splice(i, 1) : arr.push(v); }
+// 描き直しても、スクロールできる一覧（sel）とページのスクロール位置を保つ
+function keepScroll(sel, fn){
+  const el = $(sel), top = el ? el.scrollTop : 0, x = window.scrollX, y = window.scrollY;
+  fn();
+  const el2 = $(sel); if(el2) el2.scrollTop = top;
+  window.scrollTo(x, y);
+}
 
 document.addEventListener('click', e => {
   const tb = e.target.closest('nav.tabs button');
@@ -1379,20 +1807,25 @@ document.addEventListener('click', e => {
     case 'close': closeDetail(); break;
     case 'sciv': toggle(search.civs, v); search.limit = 100; render(); break;
     case 'scivmode': search.civMode = v; render(); break;
-    case 'sreset': search = {name:'', text:'', civs:[], civMode:'any', cmin:'', cmax:'', pmin:'', pmax:'', type:'', rarity:'', set:'', sort:'cost', limit:100}; render(); break;
+    case 'sreset': search = {name:'', text:'', race:'', civs:[], civMode:'any', cmin:'', cmax:'', pmin:'', pmax:'', type:'', rarity:'', set:'', sort:'cost', limit:100}; render(); break;
     case 'more': search.limit += 100; updateResults(); break;
-    case 'search-to-quiz': searchRange = new Set(lastResults.map(c => c.id)); quizCfg.civs = []; quizCfg.set = ''; saveCfg(); tab = 'quiz'; quizView = 'setup'; render(); window.scrollTo(0, 0); break;
+    case 'qsets-all': quizCfg.sets = []; saveCfg(); setPickOpen = true; keepScroll('.setlist', render); break;  // すべて選ぶのは「すべて」（空の配列）と同じ
+    case 'qsets-none': quizCfg.sets = [SETS_NONE]; saveCfg(); setPickOpen = true; keepScroll('.setlist', render); break;
+    case 'search-to-quiz': searchRange = new Set(lastResults.map(c => c.id)); quizCfg.civs = []; quizCfg.sets = []; saveCfg(); tab = 'quiz'; quizView = 'setup'; render(); window.scrollTo(0, 0); break;
     case 'reset-data':
       if(host && host.phase !== 'lobby'){ importReport = {fatal:'大会の進行中はカードデータを入れ替えられません。大会が終わってから元に戻してください。'}; render(); break; }
       (async () => { await store.del('cards'); cards = SAMPLE.map(prepCard); dataSource = 'sample'; searchRange = null; session = null; quizView = 'setup'; importReport = null; rebuild(); if(host){ host.share = false; hostSync(); } render(); })(); break;
     case 'copy-tpl': (async () => { try{ await navigator.clipboard.writeText(TEMPLATE); t.textContent = 'コピーしました'; }catch(err){ t.textContent = 'コピーできませんでした。上の枠から選択してください'; } })(); break;
     case 'goto-quiz': tab = 'quiz'; quizView = 'setup'; render(); window.scrollTo(0, 0); break;
-    case 'pcfg': { const k = t.dataset.k, val = k === 'mode' ? v : Number(v); partyCfg[k] = val; saveJSON('dmpq-party', partyCfg); if(host && host.phase === 'lobby') host.cfg[k] = val; render(); if(host && $('details.panel')) $('details.panel').open = true; } break;
+    case 'pcfg': { const k = t.dataset.k, val = k === 'mode' || k === 'game' ? v : Number(v); if(k === 'game' && !own(GAMES, val)) break; partyCfg[k] = val; saveJSON('dmpq-party', partyCfg); if(host && host.phase === 'lobby') host.cfg[k] = val; render(); if(host && $('details.panel')) $('details.panel').open = true; } break;
     case 'host-create': createRoom(); break;
     case 'host-start': partyError = ''; hostStart(); window.scrollTo(0, 0); break;
     case 'host-close-q': closeQuestion(); break;
-    case 'host-next': hostNext(); window.scrollTo(0, 0); break;
-    case 'host-back': host.phase = 'lobby'; host.share = false; hostSync(); break;
+    case 'host-next': hostHurry(); break;
+    case 'host-back': hostStopNext(); host.phase = 'lobby'; host.share = false; partyError = ''; hostSync(); break;
+    case 'host-kick': { const p = host && host.players.get(t.dataset.pid); if(p && confirm(`「${p.name}」を除外しますか？この識別子ではこの部屋に参加できなくなります（別のブラウザなどからは入り直せます）。`)) hostKick(p.pid); } break;
+    case 'host-reset': if(host && (host.phase === 'lobby' || host.phase === 'final') && host.players.size && confirm(`参加者${host.players.size}人との接続を切って、メンバーを空にしますか？参加者はもう一度参加し直せます。`)) hostResetPlayers(); break;
+    case 'p-card': playerCardDetail(); break;
     case 'host-close': if(confirm('部屋を閉じますか？参加者との接続が切れます。')) closeRoom(); break;
     case 'copy-url': (async () => { try{ await navigator.clipboard.writeText(joinURL(host.code)); t.textContent = 'コピーしました'; }catch(err){ t.textContent = 'コピーできませんでした'; } })(); break;
     case 'join': joinRoom($('#j-code').value, $('#j-name').value); break;
@@ -1412,7 +1845,14 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const el = e.target;
   if(el.dataset.s){ search[el.dataset.s] = el.value; updateResults(); return; }
-  if(el.dataset.bind === 'qset'){ quizCfg.set = el.value; saveCfg(); render(); return; }
+  if(el.hasAttribute && el.hasAttribute('data-qset')){
+    // 「すべて」（空の配列）から外したときは、今のデータの全弾から外した弾を除いた一覧にする。全弾がそろったら空の配列に戻す
+    const v = el.value, all = setsNewestFirst();
+    let cur = quizCfg.sets.length ? quizCfg.sets.filter(x => x !== SETS_NONE) : all.slice();
+    cur = cur.filter(x => x !== v); if(el.checked) cur.push(v);
+    quizCfg.sets = all.length && all.every(x => cur.includes(x)) ? [] : cur.length ? cur : [SETS_NONE];
+    saveCfg(); setPickOpen = true; keepScroll('.setlist', render); return;
+  }
   if(el.id === 'csvfile' && el.files[0]){ handleFile(el.files[0]); return; }
   if(el.hasAttribute && el.hasAttribute('data-pshare')){ if(host && host.phase === 'lobby'){ host.share = el.checked && dataSource === 'csv'; hostSync(); } return; }
   if(el.hasAttribute && el.hasAttribute('data-pbonus')){ partyCfg.bonus = el.checked; saveJSON('dmpq-party', partyCfg); if(host && host.phase === 'lobby') host.cfg.bonus = el.checked; return; }
@@ -1423,6 +1863,8 @@ document.addEventListener('change', e => {
     saveJSON('dmpq-settings', settings); cards.forEach(buildKeys);
   }
 });
+// 収録弾の一覧の開閉を覚えておく（toggle は伝わらないので capture で受ける）
+document.addEventListener('toggle', e => { if(e.target && e.target.id === 'setpick') setPickOpen = e.target.open; if(e.target && e.target.id === 'kickpick') kickPickOpen = e.target.open; }, true);
 document.addEventListener('keydown', e => {
   if(e.isComposing || e.keyCode === 229) return;
   if(e.key === 'Escape' && !$('#sheet').hidden){ closeDetail(); return; }
