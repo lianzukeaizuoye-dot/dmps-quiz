@@ -118,6 +118,7 @@ label.field > *{margin-top:4px}
 .clue{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 18px;margin-bottom:16px}
 .ask{font-weight:700;font-size:15px;color:var(--sub);margin-bottom:12px}
 .ask .target{color:var(--target);font-weight:900;font-size:1.12em}
+.qname .target,.correct-big .target{color:var(--target)}
 blockquote.ft{margin:0;font-size:19px;line-height:1.8;font-style:italic;border-left:4px solid var(--primary);padding:2px 0 2px 14px}
 .cardtext{font-size:16px;line-height:1.8;white-space:normal}
 .spec{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
@@ -868,8 +869,8 @@ let partyCfg = loadJSON('dmpq-party', {count:10, time:30, mode:'free', bonus:tru
 const GAMES = {
   normal:{label:'通常', rule:'全員が同じ問題に答えます。評価と速さで点が入ります。'},
   dobon:{label:'ドボン', rule:'出題と配点は通常と同じ。✖︎か時間切れで失格になり、以後は観戦です。最後まで生き残った人が優勝です。'},
-  kabu:{label:'かぶっちゃやーよ', rule:'お題に合うカード名を全員が1枚ずつ答えます。ほかの人と同じカードを答えると0点です。'},
-  five:{label:'ファイブボンバー', rule:'ランダムな順番で1人ずつ、お題に合うカード名をリレーで答えます。そのお題で出たカードは無効です。'}
+  kabu:{label:'かぶっちゃやーよ', rule:'お題に合うカード名を全員が1枚ずつ答えます。ほかの人と同じカードを答えると0点です。お題の「〇文明」は多色のカードも含みます。'},
+  five:{label:'ファイブボンバー', rule:'ランダムな順番で1人ずつ、お題に合うカード名をリレーで答えます。そのお題で出たカードは無効です。お題の「〇文明」は多色のカードも含みます。'}
 };
 const THEME_GAMES = ['kabu', 'five'];
 const gameOf = cfg => own(GAMES, cfg && cfg.game) ? cfg.game : 'normal';
@@ -901,7 +902,9 @@ function boardHTML(rows, limit = 30){
   return `<ol class="board">${rows.slice(0, limit).map(r => `<li class="${r.me ? 'me' : ''} ${r.online === false ? 'off' : ''}"><span class="rk">${esc(r.rank)}</span><span>${esc(r.name)}${r.me ? '（あなた）' : ''}${r.out ? ' <small class="ng">失格</small>' : ''}</span><span class="sc">${esc(r.score)}点</span></li>`).join('')}</ol>`;
 }
 // お題の表示（主催者・参加者で共通。text は参加者側では cleanState 済み）
-const themeClueHTML = t => `<p class="ask">お題に当てはまる${askTarget('カード名')}を1つ答えてください</p><p class="qname">${esc(t && t.text)}</p>`;
+// お題の文の最後の「カード名」（答える対象）を色付けする
+const themeTextHTML = text => { text = String(text ?? ''); return text.endsWith('カード名') ? esc(text.slice(0, -4)) + askTarget('カード名') : esc(text); };
+const themeClueHTML = t => `<p class="ask">次のお題に当てはまる${askTarget('カード名')}を1つ答えてください</p><p class="qname">${themeTextHTML(t && t.text)}</p>`;
 const gameInfo = g => own(GAMES, g) ? GAMES[g] : GAMES.normal;
 const ruleHTML = g => `<p class="note" style="margin-top:0">形式：<b>${esc(gameInfo(g).label)}</b>　${esc(gameInfo(g).rule)}</p>`;
 function timerHTML(id){ return `<div class="timer" id="${id}"><span class="tnum">--</span><span class="tbar"><span style="width:100%"></span></span></div>`; }
@@ -912,6 +915,13 @@ function updTimer(sel, rem, dur){
 }
 /* 正解発表から次の問題までのカウントダウン。主催者が「次の問題」を押すと、残りが NEXT_SHORT_MS より多ければそこまで縮める */
 const MAX_PLAYERS = 30, NEXT_MS = 15000, NEXT_SHORT_MS = 5000;
+const EVICT_OFF_MS = 60000, EVICT_GAP_MS = 10000, EVICT_MAX = 5;  // 満員のとき外せるのは、切断して60秒以上の人を、部屋全体で10秒に1人まで・合計5人まで
+// 主催者へのお知らせ（エラーではないもの）。8秒で消える。次のお知らせで上書きし、ロビーに戻ったときと開始したときにも消す
+let partyNotice = '', noticeTimer = 0;
+function setNotice(msg){
+  partyNotice = msg; clearTimeout(noticeTimer);
+  noticeTimer = msg ? setTimeout(() => { partyNotice = ''; if(tab === 'party') render(); }, 8000) : 0;
+}
 const nextSec = rem => Math.max(0, Math.ceil(rem / 1000));
 function nextCountHTML(id, rem, last){ return `<p class="nextcount" id="${id}">${last ? '最終結果' : '次の問題'}まで<b>${esc(nextSec(rem))}</b>秒</p>`; }
 // 小さい表示（id の要素）の秒数と、残り5秒以下の大きな表示（#countdown）を書き換える。rem が null なら大きな表示を消す
@@ -937,40 +947,153 @@ const THEME_WORDS = ['ブロッカー','S・トリガー','W・ブレイカー',
   'シンパシー','進化','墓地','マナゾーン','シールド','山札','手札','タップ','破壊','パワーアタッカー'];
 const ntext = c => c._ntext ?? (c._ntext = norm(c.text));
 const THEME_NWORDS = THEME_WORDS.map(w => [w, norm(w)]);
+const pickOf = a => a[Math.floor(Math.random() * a.length)];
 const themeCache = new WeakMap();
-// list（出題範囲のカード）にあるお題の候補をすべて挙げ、キーごとに、当てはまるカードの枚数（n）と異なる名前（names）を1回で集計する
-// 候補は、文明×コスト（範囲にある組み合わせ）・カードタイプ・収録弾・種族（範囲に出てくる値）・テキストの言葉（THEME_WORDS）
-function themeCandidates(list){
+/* お題は、種類の違う条件（アトム）を2〜3個組み合わせて作る。種類は 文明・コスト・パワー・タイプ・種族・収録弾・テキストの言葉 */
+const THEME_KINDS = ['civ', 'type', 'cost', 'power', 'race', 'set', 'word'];  // お題の文に並べる順
+const POWER_STEPS = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 12000, 15000, 20000];
+// 種族に含む語（部分一致）。「ナイト」は「ナイトメア」にも当たってしまうので入れない（「ビースト」が「ビーストフォーク」に当たるのは意図どおり）
+const RACE_PARTS = ['ドラゴン', 'ドラグナー', 'エンジェル', 'コマンド', 'デーモン', 'ゾンビ', 'サムライ', 'ビースト', 'ファイター', 'ガーディアン', 'マシン', 'ハンター', 'エイリアン'];
+const THEME_TRIES = 3000, THEME_BUDGET_MS = 100;  // 試行の上限（最初の50回は時間を見ない）
+const THEME_EXAMPLES = 40;  // 正解発表で見せる有効な答えの最大数（hi の最大値。30人なら 30〜40 なので、ふつうは全件）
+const THEME_COST_MAX = 20, THEME_VALUES_MAX = 500;  // コストの条件は0〜20だけ。タイプ・種族・収録弾は多い順に500種類まで、文明は決まった6つだけ（アトムの数を抑える）
+// list（出題範囲のカード）について、アトムごとに当てはまるカードのビット集合と、カードごとに満たすアトムの一覧を1回だけ作る
+// アトムの test は list の外のカードにも使える（回答の判定用）。phrase はお題の文の部品で、noun は「〜で、」「〜の」でつなぐ名詞か
+function themeAtoms(list){
   if(themeCache.has(list)) return themeCache.get(list);
-  const m = new Map();
-  const add = (key, mk, c) => { let e = m.get(key); if(!e){ e = {key, ...mk(), n:0, names:new Set()}; m.set(key, e); } e.n++; e.names.add(c._norm); };
-  for(const c of list){
-    const cost = c.cost;
-    for(const civ of new Set(c.civ)) add(`cc|${civ}|${cost}`, () => ({text:`コスト${cost}の${civ}のカード（多色を含む）`, test:x => x.cost === cost && x.civ.includes(civ)}), c);
-    if(c.type){ const t = c.type; add(`type|${t}`, () => ({text:`カードタイプが「${t}」のカード`, test:x => x.type === t}), c); }
-    for(const st of new Set(c.set)) add(`set|${st}`, () => ({text:`「${st}」に収録されたカード`, test:x => x.set.includes(st)}), c);
-    for(const r of new Set(c.race)) add(`race|${r}`, () => ({text:`種族に「${r}」を持つカード`, test:x => x.race.includes(r)}), c);
+  const n = list.length, W = (n + 31) >>> 5, atoms = [], byKey = new Map(), cardAtoms = list.map(() => []);
+  const add = (i, kind, key, mk) => {
+    let a = byKey.get(key);
+    if(!a){ a = {kind, key, ...mk(), bits:new Uint32Array(W), n:0, cards:[]}; atoms.push(a); byKey.set(key, a); }
+    a.bits[i >>> 5] |= 1 << (i & 31); a.n++; a.cards.push(i); cardAtoms[i].push(a);
+  };
+  const topValues = f => {
+    const m = new Map();
+    for(const c of list) for(const v of new Set(f(c))) m.set(v, (m.get(v) || 0) + 1);
+    return new Set([...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, THEME_VALUES_MAX).map(e => e[0]));
+  };
+  const okSet = topValues(c => c.set), okRace = topValues(c => c.race), okType = topValues(c => c.type ? [c.type] : []);
+  const okCiv = new Set([...CIVS, 'ゼロ']);  // 文明は決まった6つだけ
+  const okCost = v => Number.isInteger(v) && v >= 0 && v <= THEME_COST_MAX;
+  const costs = [...new Set(list.map(c => c.cost).filter(okCost))].sort((a, b) => a - b);
+  const costMax = list.reduce((m, c) => Number.isFinite(c.cost) && c.cost > m ? c.cost : m, -Infinity);  // 20を超えるコストも含めた最大（展開すると行数が多いときに引数の上限に当たる）
+  const names = new Map(), nameId = new Int32Array(n);
+  list.forEach((c, i) => {
+    if(!names.has(c._norm)) names.set(c._norm, names.size);
+    nameId[i] = names.get(c._norm);
+    for(const v of new Set(c.civ)) if(okCiv.has(v)) add(i, 'civ', `civ|${v}`, () => ({phrase:`${v}文明`, noun:true, test:x => x.civ.includes(v)}));
+    // しきい値 N は0〜20だけ。ただし「N以上」はコストが20を超えるカードにも当たるので、ビット集合にも入れる（test と食い違わないように）
+    if(Number.isFinite(c.cost)){
+      const v = c.cost;
+      if(okCost(v)) add(i, 'cost', `cost=${v}`, () => ({phrase:`コスト${v}`, noun:true, test:x => x.cost === v}));
+      for(const N of costs){
+        // 「N以上」は最小より大きく最大より小さい N だけ（最小なら全部、最大なら「コストN」と同じ）。「N以下」は最小より大きく最大より小さい N だけ（「コスト0以下」のような不自然なお題を作らない）
+        if(N > costs[0] && N < costMax && v >= N) add(i, 'cost', `cost>=${N}`, () => ({phrase:`コスト${N}以上`, noun:true, test:x => x.cost >= N}));
+        if(N > costs[0] && N < costs[costs.length - 1] && v <= N) add(i, 'cost', `cost<=${N}`, () => ({phrase:`コスト${N}以下`, noun:true, test:x => x.cost <= N}));
+      }
+    }
+    if(Number.isFinite(c.power)) for(const N of POWER_STEPS){
+      if(c.power >= N) add(i, 'power', `power>=${N}`, () => ({phrase:`パワー${N}以上`, noun:true, test:x => Number.isFinite(x.power) && x.power >= N}));
+      if(c.power <= N) add(i, 'power', `power<=${N}`, () => ({phrase:`パワー${N}以下`, noun:true, test:x => Number.isFinite(x.power) && x.power <= N}));
+    }
+    if(c.type && okType.has(c.type)){ const t = c.type; add(i, 'type', `type|${t}`, () => ({phrase:t, noun:true, test:x => x.type === t})); }
+    for(const st of new Set(c.set)) if(okSet.has(st)) add(i, 'set', `set|${st}`, () => ({phrase:`「${st}」に収録された`, noun:false, test:x => x.set.includes(st)}));
+    for(const r of new Set(c.race)) if(okRace.has(r)) add(i, 'race', `race|${r}`, () => ({phrase:`種族に「${r}」を持つ`, noun:false, test:x => x.race.includes(r)}));
+    for(const w of RACE_PARTS) if(c.race.some(r => r.includes(w))) add(i, 'race', `race~${w}`, () => ({phrase:`種族に「${w}」を含む`, noun:false, test:x => x.race.some(r => r.includes(w))}));
     const t = ntext(c);
-    for(const [w, nw] of THEME_NWORDS) if(nw && t.includes(nw)) add(`word|${w}`, () => ({text:`テキストに「${w}」とあるカード`, test:x => ntext(x).includes(nw)}), c);
-  }
-  const all = [...m.values()];
-  themeCache.set(list, all);
-  return all;
+    for(const [w, nw] of THEME_NWORDS) if(nw && t.includes(nw)) add(i, 'word', `word|${w}`, () => ({phrase:`テキストに「${w}」とある`, noun:false, test:x => ntext(x).includes(nw)}));
+  });
+  const idx = {n, W, atoms, byKey, cardAtoms, nameId, stamp:new Int32Array(names.size), gen:0};
+  themeCache.set(list, idx);
+  return idx;
 }
-// list から、条件に合う異なるカード名が minCount 以上あるお題を作る。使っていない（used に無い）候補を順に見て、最初に条件を満たしたものを使う（条件を満たす候補があれば必ず見つかる）
-// 範囲の全カードに当たるお題（例：収録弾を1つだけ選んだときのその弾）は、お題にならないので除く。見つからなければ null
-// 種類（文明×コスト・タイプ・収録弾・言葉・種族）の順と、各種類の中のキーをシャッフルし、種類を順に回りながら1つずつ試す（種類がほぼ同じ確率で出るように）
-function makeTheme(list, minCount, used = new Set()){
-  const byKind = new Map();
-  for(const e of themeCandidates(list)){ const k = e.key.split('|')[0], a = byKind.get(k); a ? a.push(e) : byKind.set(k, [e]); }
-  const queues = shuffle([...byKind.values()]).map(shuffle);
-  for(let i = 0; queues.some(q => i < q.length); i++){
-    for(const q of queues){
-      const e = q[i];
-      if(!e || used.has(e.key) || e.n >= list.length || e.names.size < minCount) continue;
-      return {key:e.key, text:e.text, test:e.test};
+// アトムの組み合わせに当てはまるカードの枚数と、異なる名前の数（hi を超えたら数えるのをやめる）
+function themeCount(idx, as, hi){
+  const {W, nameId, stamp} = idx, gen = ++idx.gen;
+  let n = 0, names = 0;
+  for(let w = 0; w < W; w++){
+    let b = as[0].bits[w];
+    for(let k = 1; k < as.length && b; k++) b &= as[k].bits[w];
+    while(b){
+      const t = b & -b, i = (w << 5) + 31 - Math.clz32(t); b ^= t;
+      n++;
+      if(stamp[nameId[i]] !== gen){ stamp[nameId[i]] = gen; if(++names > hi) return {n, names}; }
     }
   }
+  return {n, names};
+}
+// 当てはまるカードの集合のハッシュ（FNV-1a）。集合が同じお題（文が違っても答えが同じ）を使用済みとして扱うのに使う
+function themeSig(idx, as){
+  let h = 0x811c9dc5;
+  for(let w = 0; w < idx.W; w++){
+    let b = as[0].bits[w];
+    for(let k = 1; k < as.length; k++) b &= as[k].bits[w];
+    h = Math.imul(h ^ (b >>> 0), 16777619) >>> 0;
+  }
+  return 'set#' + h.toString(16);
+}
+// お題の文（自然な日本語にし、最後は「カード名」）。例：火文明で、コスト5以上で、種族に「ドラゴン」を含むカード名
+function themeText(as){
+  const a = [...as].sort((x, y) => THEME_KINDS.indexOf(x.kind) - THEME_KINDS.indexOf(y.kind));
+  return a.map((x, i) => {
+    const next = a[i + 1];
+    if(!next) return x.phrase + (x.noun ? 'の' : '');
+    if(x.kind === 'civ' && next.kind === 'type') return x.phrase + 'の';
+    return x.phrase + (x.noun ? 'で、' : '、');
+  }).join('') + 'カード名';
+}
+const themeKey = as => as.map(a => a.key).sort().join('&');
+// 重み w の付いた items から、重複なしに k 個を選ぶ
+function weightedSample(items, w, k){
+  items = items.slice(); const out = [];
+  while(out.length < k && items.length){
+    let r = Math.random() * items.reduce((s, x) => s + w(x), 0), i = 0;
+    for(; i < items.length - 1; i++){ r -= w(items[i]); if(r <= 0) break; }
+    out.push(items.splice(i, 1)[0]);
+  }
+  return out;
+}
+// list から、条件に合う異なるカード名が lo 以上 hi 以下のお題を作る。used（キーと、当てはまるカードの集合のハッシュ）にあるお題と、範囲の全カードに当たるお題は使わない
+// kindCounts（大会の中でその種類を使った回数）が少ない種類を優先する（重み 1/(1+回数)）
+// 1. 必ず入れる種類を重みつきで決め、その種類のアトムを1つ選ぶ。そのアトムに当たるカードから1枚を選び、そのカードが満たす別の種類のアトムを1〜2個足す（答えが必ず1件以上ある）
+// 2. 試行回数か時間の上限まで見つからなければ、1つのアトムだけのお題を、使った回数の少ない種類から順に探す。それも無ければ null
+// 返す値の kinds は使った種類、sig は当てはまるカードの集合のハッシュ（呼び出し側で used に足す）
+function makeTheme(list, lo, used = new Set(), hi = Math.max(30, lo + 10), kindCounts = {}){
+  if(!list.length) return null;
+  const idx = themeAtoms(list), t0 = performance.now(), weight = kd => 1 / (1 + (own(kindCounts, kd) || 0));
+  // used にキーだけが入っていても、そのお題と当てはまるカードの集合が同じお題を使わないように、キーから集合のハッシュを求めて足す
+  const usedSig = new Set([...used].filter(k => typeof k === 'string' && k.startsWith('set#')));
+  for(const k of used){ if(typeof k !== 'string' || k.startsWith('set#')) continue; const as = k.split('&').map(x => idx.byKey.get(x)); if(as.length && as.every(Boolean)) usedSig.add(themeSig(idx, as)); }
+  const tryAs = as => {
+    if(used.has(themeKey(as))) return null;
+    const r = themeCount(idx, as, hi);
+    if(r.n >= list.length || r.names < lo || r.names > hi) return null;
+    const sig = themeSig(idx, as);
+    if(usedSig.has(sig)) return null;
+    const tests = as.map(a => a.test);
+    return {key:themeKey(as), sig, kinds:as.map(a => a.kind), text:themeText(as), test:c => tests.every(f => f(c))};
+  };
+  // 範囲の8割を超えるカードに当たるアトム（例：コスト13以下）は絞り込みにならないので、組み合わせには使わない
+  const narrow = a => a.n <= list.length * 0.8;
+  const comboKinds = new Map();
+  for(const a of idx.atoms) if(narrow(a)){ const g = comboKinds.get(a.kind); g ? g.push(a) : comboKinds.set(a.kind, [a]); }
+  // まず「必ず入れる種類」を重みつきで順に決め、その種類ごとに試す（種類によって条件に合う確率が違っても、出る種類が偏らないように）
+  const order = weightedSample([...comboKinds.keys()], weight, comboKinds.size), per = Math.ceil(THEME_TRIES / Math.max(1, order.length));
+  let tries = 0;
+  for(const main of order){
+    for(let j = 0; j < per && (j < 5 || tries < 50 || performance.now() - t0 < THEME_BUDGET_MS); j++, tries++){  // 時間の上限を超えても、種類ごとに最低5回は試す
+      const a0 = pickOf(comboKinds.get(main)), ci = pickOf(a0.cards), byKind = new Map();
+      for(const a of idx.cardAtoms[ci]){ if(a.kind === main || !narrow(a)) continue; const g = byKind.get(a.kind); g ? g.push(a) : byKind.set(a.kind, [a]); }
+      if(!byKind.size) continue;
+      const k = byKind.size >= 2 && Math.random() < 0.5 ? 2 : 1;
+      const t = tryAs([a0, ...weightedSample([...byKind.keys()], weight, k).map(kd => pickOf(byKind.get(kd)))]);
+      if(t) return t;
+    }
+  }
+  const byKind = new Map();
+  for(const a of idx.atoms){ const g = byKind.get(a.kind); g ? g.push(a) : byKind.set(a.kind, [a]); }
+  const queues = shuffle([...byKind.entries()]).sort((a, b) => weight(b[0]) - weight(a[0])).map(e => shuffle(e[1]));
+  for(let i = 0; queues.some(q => i < q.length); i++) for(const q of queues){ const t = q[i] && tryAs([q[i]]); if(t) return t; }
   return null;
 }
 // お題の回答を、全カードの名前・読み・別名と照合する。◎（完全一致で、1つの名前に決まる）か○（4文字以上の名前・読み・別名と1文字違いで、候補が1つの名前に決まる）だけを受け付ける
@@ -1000,11 +1123,11 @@ function partyPools(){
   return pools;
 }
 function createRoom(){
-  partyError = '';
+  partyError = ''; setNotice('');
   if(typeof Peer === 'undefined'){ partyError = '通信用の部品を読み込めませんでした。ネットワークを確認して、ページを開き直してください。'; render(); return; }
   const code = genCode();
   const peer = new Peer(PEER_PREFIX + code, {debug:0});
-  host = {peer, code, players:new Map(), phase:'opening', cfg:{...partyCfg}, idx:0, total:partyCfg.count, used:new Set(), q:null, pub:null, answers:new Map(), results:null, startedAt:0, endsAt:0, nextAt:0, nextTimer:0, banned:new Set(), share:false, sending:0, dataCount:0, dataStarts:new Map(), dataActive:new Set(), dataDone:new Set(), dataBytes:0};
+  host = {peer, code, players:new Map(), phase:'opening', cfg:{...partyCfg}, idx:0, total:partyCfg.count, used:new Set(), q:null, pub:null, answers:new Map(), results:null, startedAt:0, endsAt:0, evictCount:0, evictAt:0, nextAt:0, nextTimer:0, banned:new Set(), share:false, sending:0, dataCount:0, dataStarts:new Map(), dataActive:new Set(), dataDone:new Set(), dataBytes:0};
   const me = host;
   peer.on('open', () => { if(host !== me) return; host.phase = 'lobby'; render(); });
   peer.on('error', err => {
@@ -1038,12 +1161,19 @@ function hostOnData(conn, m){
     const name = (typeof m.name === 'string' ? m.name : '').trim().slice(0, 16) || '名無し';
     let p = host.players.get(pid);
     if(!p){
+      // 満員のとき、ロビーなら、切断してから60秒以上たった人のうち最も前から参加している人を外して枠を空ける
+      // 悪用（つなぎ直しをくり返して人を追い出す）を防ぐため、外すのは部屋全体で10秒に1人まで。進行中・最終結果では外さない（得点と順位表を保つ）
+      const now = Date.now();
+      if(host.players.size >= MAX_PLAYERS && host.phase === 'lobby' && (host.evictCount || 0) < EVICT_MAX && now - (host.evictAt || 0) >= EVICT_GAP_MS){
+        const old = [...host.players.values()].find(x => !x.online && x.offAt && now - x.offAt >= EVICT_OFF_MS);
+        if(old){ host.players.delete(old.pid); host.answers.delete(old.pid); host.evictAt = now; host.evictCount = (host.evictCount || 0) + 1; setNotice(`満員のため、切断中の${old.name}さんを外しました。`); }
+      }
       if(host.players.size >= MAX_PLAYERS){ try{ conn.send({t:'error', msg:'満員のため参加できません（最大30人）。'}); }catch(e){} return; }
       p = {pid, name, score:0}; host.players.set(pid, p);
       if(gameOf(host.cfg) === 'dobon' && (host.phase === 'question' || host.phase === 'reveal')){ p.out = true; p.outAt = 0; }  // ドボンの途中から入った人は観戦
     }
     if(p.conn && p.conn !== conn){ try{ p.conn.close(); }catch(e){} }
-    p.name = name; p.conn = conn; p.online = true; conn._pid = pid;
+    p.name = name; p.conn = conn; p.online = true; p.offAt = 0; conn._pid = pid;
     hostSyncSoon();
   } else if(m.t === 'answer'){
     const p = host.players.get(conn._pid);
@@ -1168,7 +1298,7 @@ function hostDataShow(){ const el = $('#h-data'); if(el && host) el.textContent 
 function hostOnClose(conn){
   const p = host.players.get(conn._pid);
   if(p && p.conn === conn){
-    p.online = false;
+    p.online = false; p.offAt = Date.now();
     // ファイブボンバーで順番の人が切断したら、すぐ次の人へ
     if(host.phase === 'question' && gameOf(host.cfg) === 'five' && host.turn && host.turn.order[host.turn.i] === p.pid){ fiveAdvance('切断のため飛ばしました'); return; }
     hostSyncSoon();
@@ -1215,7 +1345,7 @@ function stateFor(p, rk){
     s.reveal = {
       answer:theme ? host.q.theme.text : num ? String(c[host.q.field]) : c.name,
       sub:theme ? '' : num ? `${c.name}の${host.q.field === 'cost' ? 'コスト' : 'パワー'}` : c.reading,
-      examples:theme ? (host.examples || []).slice(0, 10) : [], last:hostIsLast(),
+      examples:theme ? (host.examples || []).slice(0, THEME_EXAMPLES) : [], last:hostIsLast(),
       mine:host.results.find(r => r.pid === p.pid) || null,
       // 全員分の結果（回答は締め切ったあとなので見せてよい）。ほかの参加者の pid は送らず、自分の行だけ me を付ける
       results:host.results.slice(0, MAX_PLAYERS).map(r => cleanResult({name:r.name, g:r.g, pts:r.pts, input:r.input, msg:r.msg, me:r.pid === p.pid})),
@@ -1243,7 +1373,8 @@ function hostStart(){
   if(THEME_GAMES.includes(game)){
     const range = rangeCards();
     if(!range.length){ partyError = '出題範囲にカードがありません。クイズタブで範囲を見直してください。'; render(); return; }
-    host.range = range; host.rangeIds = new Set(range.map(c => c.id)); host.usedThemes = new Set();
+    host.range = range; host.rangeIds = new Set(range.map(c => c.id)); host.usedThemes = new Set(); host.themeKinds = {};
+    themeAtoms(range);  // お題の索引は開始時に作っておく（最初の問題で画面が止まらないように）
     host.nameIndex = new Map();  // 正規化した名前・読み・別名 → カード（お題の回答の照合用）
     for(const c of cards) for(const k of c._keys){ const a = host.nameIndex.get(k); a ? a.push(c) : host.nameIndex.set(k, [c]); }
   } else {
@@ -1251,7 +1382,7 @@ function hostStart(){
     if(!Object.keys(pools).length){ partyError = '出題できる問題がありません。クイズタブで形式や範囲を見直してください。'; render(); return; }
     host.pools = pools;
   }
-  partyError = '';
+  partyError = ''; setNotice('');
   hostStopNext();
   host.used = new Set(); host.idx = 0; host.total = host.cfg.count; host.themeOut = false;
   for(const p of host.players.values()){ p.score = 0; p.out = false; p.outAt = 0; }
@@ -1264,12 +1395,13 @@ function hostNextQ(){
   host.answers = new Map(); host.results = null; host.turn = null;
   if(THEME_GAMES.includes(game)){
     const online = [...host.players.values()].filter(p => p.online);
-    const theme = makeTheme(host.range, Math.max(online.length * 3, 10), host.usedThemes);
+    const lo = Math.max(10, online.length), theme = makeTheme(host.range, lo, host.usedThemes, Math.max(30, lo + 10), host.themeKinds);  // 答えの数の目標（ファイブボンバーは全員が1回ずつ答えるので、人数分は必要）
     if(!theme){
       if(host.idx === 1){ host.idx = 0; host.phase = 'lobby'; host.share = false; partyError = '人数に対して答えが十分にあるお題を作れませんでした。出題範囲を広げてください。'; hostSync(); return; }
       host.idx--; host.themeOut = true; host.phase = 'final'; partyError = 'これ以上お題を作れなかったため、大会を終えました。'; hostSync(); return;
     }
-    host.usedThemes.add(theme.key);
+    host.usedThemes.add(theme.key); host.usedThemes.add(theme.sig);
+    theme.kinds.forEach(k => host.themeKinds[k] = (host.themeKinds[k] || 0) + 1);
     host.q = {fmt:'theme', theme}; host.pub = null;
     if(game === 'five'){
       host.turn = {order:shuffle(online.map(p => p.pid)), i:-1, log:[], used:new Set()};
@@ -1324,8 +1456,8 @@ function closeQuestion(){
       return {pid:p.pid, name:p.name, input:a.text, g:res.g, pts, ms:a.ms, msg:[res.msg, dobon && res.g === X ? '失格' : ''].filter(Boolean).join('・')};
     }).sort((a, b) => b.pts - a.pts || a.ms - b.ms);
   }
-  // お題の形式は、有効な回答の例（異なる名前を最大10件）を出す
-  if(THEME_GAMES.includes(game)) host.examples = shuffle([...new Set(host.range.filter(q.theme.test).map(c => c.name))]).slice(0, 10);
+  // お題の形式は、有効な答え（異なる名前を最大 THEME_EXAMPLES＝40件。お題の答えは hi 以下なので、ふつうは全件）を出す
+  if(THEME_GAMES.includes(game)) host.examples = [...new Set(host.range.filter(q.theme.test).map(c => c.name))].sort((a, b) => a.localeCompare(b, 'ja')).slice(0, THEME_EXAMPLES);
   host.phase = 'reveal'; hostArmNext(NEXT_MS); hostSync();
 }
 // かぶっちゃやーよ：有効な回答のうち、ほかの人と同じカード（名前で比べる）を答えた人は全員0点
@@ -1386,6 +1518,8 @@ function hostHTML(){
   const head = `<div class="qbar"><span>部屋コード <b>${h.code}</b>　参加 ${online.length}人</span><button class="btn ghost" data-act="host-close">部屋を閉じる</button></div>`;
   if(h.phase === 'lobby') return `
     ${partyError ? `<p class="ng">${esc(partyError)}</p>` : ''}
+    ${partyNotice ? `<p class="note">${esc(partyNotice)}</p>` : ''}
+    ${h.evictCount ? `<p class="note">満員のため外した人数 ${esc(h.evictCount)}/${EVICT_MAX}</p>` : ''}
     <div style="text-align:center">
       <p class="lead" style="margin-bottom:0">この部屋コードを参加者に伝えてください</p>
       <p class="bigcode">${h.code}</p>
@@ -1427,7 +1561,7 @@ function hostHTML(){
   if(h.phase === 'reveal'){
     const c = h.q.card, num = h.q.fmt === 'num', last = hostIsLast();
     const big = theme
-      ? `<div class="correct-big"><div class="k">お題</div><div class="v">${esc(h.q.theme.text)}</div></div><p class="note" style="text-align:center">有効な回答の例：${esc((h.examples || []).join('、'))}</p>`
+      ? `<div class="correct-big"><div class="k">お題</div><div class="v">${themeTextHTML(h.q.theme.text)}</div></div><p class="note" style="text-align:center">有効な答え（${esc((h.examples || []).length)}件）：${esc((h.examples || []).join('、'))}</p>`
       : `<div class="correct-big"><div class="k">正解</div><div class="v">${esc(num ? c[h.q.field] : c.name)}</div><small>${esc(num ? `${c.name}の${h.q.field === 'cost' ? 'コスト' : 'パワー'}` : c.reading)}</small></div>`;
     return `${head}
     <div class="qbar"><span><b>第${h.idx}問 / ${h.total}</b>　${esc(theme || game === 'dobon' ? GAMES[game].label : FMT_LABEL[h.q.fmt])}</span></div>
@@ -1504,10 +1638,10 @@ function cleanState(m){
   const time = Math.min(Math.max(0, fin(m.time)), 600);
   return {
     t:'state', phase:m.phase, game:own(GAMES, m.game) ? m.game : 'normal', idx:fin(m.idx), total:fin(m.total), mode:m.mode === 'choice' ? 'choice' : 'free', time,
-    remain:Math.min(Math.max(0, fin(m.remain)), time * 1000), remainNext:Math.min(Math.max(0, fin(m.remainNext)), NEXT_MS), q:cleanQ(m.q), theme:isObj(m.theme) ? {text:str(m.theme.text, 100)} : null, relay:cleanRelay(m.relay), answered:fin(m.answered), online:fin(m.online), share:m.share === true,
+    remain:Math.min(Math.max(0, fin(m.remain)), time * 1000), remainNext:Math.min(Math.max(0, fin(m.remainNext)), NEXT_MS), q:cleanQ(m.q), theme:isObj(m.theme) ? {text:str(m.theme.text, 200)} : null, relay:cleanRelay(m.relay), answered:fin(m.answered), online:fin(m.online), share:m.share === true,
     board:Array.isArray(m.board) ? m.board.slice(0, 30).filter(isObj).map(x => ({name:str(x.name, 16), score:fin(x.score), rank:rankOf(x.rank), online:x.online === true, me:x.me === true, out:x.out === true})) : [],
     me:{name:str(me.name, 16), score:fin(me.score), rank:rankOf(me.rank), answered:me.answered === true, answerText:str(me.answerText, MAX_ANSWER), out:me.out === true},
-    reveal:r ? {answer:str(r.answer, 200), sub:str(r.sub, 200), examples:strList(r.examples, 10, 200), last:r.last === true, mine:mine ? {g:str(mine.g, 4), pts:fin(mine.pts), input:str(mine.input, MAX_ANSWER), msg:str(mine.msg, 200)} : null,
+    reveal:r ? {answer:str(r.answer, 200), sub:str(r.sub, 200), examples:strList(r.examples, THEME_EXAMPLES, 200), last:r.last === true, mine:mine ? {g:str(mine.g, 4), pts:fin(mine.pts), input:str(mine.input, MAX_ANSWER), msg:str(mine.msg, 200)} : null,
       results:Array.isArray(r.results) ? r.results.slice(0, MAX_PLAYERS).filter(isObj).map(cleanResult) : [], card:cleanCard(r.card)} : null
   };
 }
@@ -1668,8 +1802,8 @@ function playerHTML(){
     const r = s.reveal || {}, mine = r.mine, G = mine ? own(GRADE, mine.g) || GRADE[X] : null;
     return `${top}
       ${mine ? `<div class="result"><div class="stamp ${G.cls}" aria-hidden="true">${esc(mine.g)}</div><p class="verdict ${G.cls}">${G.label}</p><p class="pts">+${esc(mine.pts)}点</p>${mine.msg ? `<p class="msg">${esc(mine.msg)}</p>` : ''}</div>` : waitingHTML('この問題には参加していません')}
-      <div class="correct-big"><div class="k">${s.theme ? 'お題' : '正解'}</div><div class="v">${esc(r.answer)}</div><small>${esc(r.sub)}</small></div>
-      ${Array.isArray(r.examples) && r.examples.length ? `<p class="note" style="text-align:center">有効な回答の例：${esc(r.examples.join('、'))}</p>` : ''}
+      <div class="correct-big"><div class="k">${s.theme ? 'お題' : '正解'}</div><div class="v">${s.theme ? themeTextHTML(r.answer) : esc(r.answer)}</div><small>${esc(r.sub)}</small></div>
+      ${Array.isArray(r.examples) && r.examples.length ? `<p class="note" style="text-align:center">有効な答え（${esc(r.examples.length)}件）：${esc(r.examples.join('、'))}</p>` : ''}
       ${mine && mine.input ? `<p class="note" style="text-align:center">あなたの回答：${esc(mine.input)}</p>` : ''}
       ${s.game === 'dobon' && s.me.out ? '<p class="ng" style="text-align:center">失格（観戦中）</p>' : ''}
       ${r.card ? '<p style="text-align:center"><button class="btn" data-act="p-card">カードを見る</button></p>' : ''}
@@ -1819,10 +1953,10 @@ document.addEventListener('click', e => {
     case 'goto-quiz': tab = 'quiz'; quizView = 'setup'; render(); window.scrollTo(0, 0); break;
     case 'pcfg': { const k = t.dataset.k, val = k === 'mode' || k === 'game' ? v : Number(v); if(k === 'game' && !own(GAMES, val)) break; partyCfg[k] = val; saveJSON('dmpq-party', partyCfg); if(host && host.phase === 'lobby') host.cfg[k] = val; render(); if(host && $('details.panel')) $('details.panel').open = true; } break;
     case 'host-create': createRoom(); break;
-    case 'host-start': partyError = ''; hostStart(); window.scrollTo(0, 0); break;
+    case 'host-start': partyError = ''; setNotice(''); hostStart(); window.scrollTo(0, 0); break;
     case 'host-close-q': closeQuestion(); break;
     case 'host-next': hostHurry(); break;
-    case 'host-back': hostStopNext(); host.phase = 'lobby'; host.share = false; partyError = ''; hostSync(); break;
+    case 'host-back': hostStopNext(); host.phase = 'lobby'; host.share = false; partyError = ''; setNotice(''); hostSync(); break;
     case 'host-kick': { const p = host && host.players.get(t.dataset.pid); if(p && confirm(`「${p.name}」を除外しますか？この識別子ではこの部屋に参加できなくなります（別のブラウザなどからは入り直せます）。`)) hostKick(p.pid); } break;
     case 'host-reset': if(host && (host.phase === 'lobby' || host.phase === 'final') && host.players.size && confirm(`参加者${host.players.size}人との接続を切って、メンバーを空にしますか？参加者はもう一度参加し直せます。`)) hostResetPlayers(); break;
     case 'p-card': playerCardDetail(); break;
