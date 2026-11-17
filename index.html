@@ -869,8 +869,8 @@ let partyCfg = loadJSON('dmpq-party', {count:10, time:30, mode:'free', bonus:tru
 const GAMES = {
   normal:{label:'通常', rule:'全員が同じ問題に答えます。評価と速さで点が入ります。'},
   dobon:{label:'ドボン', rule:'出題と配点は通常と同じ。✖︎か時間切れで失格になり、以後は観戦です。最後まで生き残った人が優勝です。'},
-  kabu:{label:'かぶっちゃやーよ', rule:'お題に合うカード名を全員が1枚ずつ答えます。ほかの人と同じカードを答えると0点です。お題の「〇文明」は多色のカードも含みます。'},
-  five:{label:'ファイブボンバー', rule:'ランダムな順番で1人ずつ、お題に合うカード名をリレーで答えます。そのお題で出たカードは無効です。お題の「〇文明」は多色のカードも含みます。'}
+  kabu:{label:'かぶっちゃやーよ', rule:'お題に合うカード名を全員が1枚ずつ答えます。ほかの人と同じカードを答えると0点です。判定は通常クイズと同じで、少し違っても○（1文字違い）や△（30点）になります。お題の「〇文明」は多色のカードも含みます。'},
+  five:{label:'ファイブボンバー', rule:'ランダムな順番で1人ずつ、お題に合うカード名をリレーで答えます。そのお題で出たカードは無効です。判定は通常クイズと同じで、少し違っても○（1文字違い）や△（30点）になります。お題の「〇文明」は多色のカードも含みます。'}
 };
 const THEME_GAMES = ['kabu', 'five'];
 const gameOf = cfg => own(GAMES, cfg && cfg.game) ? cfg.game : 'normal';
@@ -948,7 +948,7 @@ const THEME_WORDS = ['ブロッカー','S・トリガー','W・ブレイカー',
 const ntext = c => c._ntext ?? (c._ntext = norm(c.text));
 const THEME_NWORDS = THEME_WORDS.map(w => [w, norm(w)]);
 const pickOf = a => a[Math.floor(Math.random() * a.length)];
-const themeCache = new WeakMap();
+const themeCache = new WeakMap(), themeValidCache = new WeakMap();
 /* お題は、種類の違う条件（アトム）を2〜3個組み合わせて作る。種類は 文明・コスト・パワー・タイプ・種族・収録弾・テキストの言葉 */
 const THEME_KINDS = ['civ', 'type', 'cost', 'power', 'race', 'set', 'word'];  // お題の文に並べる順
 const POWER_STEPS = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 12000, 15000, 20000];
@@ -1096,24 +1096,48 @@ function makeTheme(list, lo, used = new Set(), hi = Math.max(30, lo + 10), kindC
   for(let i = 0; queues.some(q => i < q.length); i++) for(const q of queues){ const t = q[i] && tryAs([q[i]]); if(t) return t; }
   return null;
 }
-// お題の回答を、全カードの名前・読み・別名と照合する。◎（完全一致で、1つの名前に決まる）か○（4文字以上の名前・読み・別名と1文字違いで、候補が1つの名前に決まる）だけを受け付ける
+// お題の回答を、全カードの名前・読み・別名と照合する。完全一致なら◎（1つの名前に決まるときだけ）
+// 完全一致しないときは、有効なカードのうち一致度が最も高いものを正解とみなして、通常クイズと同じ judgeName で○・△・✖︎を決める
+// （似ている別カードも有効で名前が違うときは「カードを1枚に決められない」。別カードが無効なら通常クイズと同じく△のまま（1文字違いでも△になる））
+// ✖︎で「もしかして」などの候補が有効なカードなら、名前を出さずに「カードを1枚に決められない」にする
+// ✖︎で候補の名前も出せないときは、全カードとの1文字違いで無効なカードに決まれば「出題範囲外／お題に合わない」と伝える
 // 有効なのは、出題範囲（host.rangeIds）にあってお題に合うカード。同じ名前のカードが複数あるときは有効なものを選ぶ
 function matchTheme(text, theme){
   const ok = c => host.rangeIds.has(c.id) && theme.test(c);
   const qc = chars(norm(text)).slice(0, MAX_ANSWER), q = qc.join('');
   if(!q) return {g:X, msg:'回答なし'};
-  let found = host.nameIndex.get(q), g = '◎';
-  if(found && new Set(found.map(c => c._norm)).size > 1) return {g:X, msg:'カードを1枚に決められない'};  // 読み・別名が名前の違う複数のカードに当たる
-  if(!found){
+  const found = host.nameIndex.get(q);
+  if(found){
+    if(new Set(found.map(c => c._norm)).size > 1) return {g:X, msg:'カードを1枚に決められない'};  // 読み・別名が名前の違う複数のカードに当たる
+    const card = found.find(ok) || found[0];
+    if(!ok(card)) return {g:X, card, msg:`「${card.name}」は${host.rangeIds.has(card.id) ? 'お題に合わない' : '出題範囲外'}`};
+    return {g:'◎', card, valid:true, msg:`「${card.name}」`};
+  }
+  let ans = null, best = 0;
+  for(const c of themeValid(theme)){ const s = cardScore(q, c, best, qc); if(s.score > best){ best = s.score; ans = c; } }
+  const r = ans ? judgeName(text, ans, false) : {g:X};
+  if(r.g === X && r.msg) return r.other && themeValid(theme).some(c => c._norm === r.other._norm) ? {g:X, msg:'カードを1枚に決められない'} : {g:X, msg:r.msg};  // 有効なカード名はヒントになるので出さない（範囲外の再録が other になっても名前で比べる）
+  if(r.g === X){
+    // 有効なカードに当たらないときだけ、全カードと1文字違いを見て、無効なカード（出題範囲外・お題に合わない）に決まればそれを伝える
     const byName = new Map();
     for(const c of cards){ if(nearCard(qc, c)){ const a = byName.get(c._norm); a ? a.push(c) : byName.set(c._norm, [c]); if(byName.size > 1) break; } }
     if(byName.size > 1) return {g:X, msg:'カードを1枚に決められない'};
-    if(!byName.size) return {g:X, msg:'カードが見つからない'};
-    found = [...byName.values()][0]; g = '○';
+    const same = byName.size ? [...byName.values()][0] : [], card = same.find(ok) || same[0];
+    if(card && !ok(card)) return {g:X, card, msg:`「${card.name}」は${host.rangeIds.has(card.id) ? 'お題に合わない' : '出題範囲外'}`};
+    return {g:X, msg:'カードが見つからない'};
   }
-  const card = found.find(ok) || found[0];
-  if(!ok(card)) return {g:X, card, msg:`「${card.name}」は${host.rangeIds.has(card.id) ? 'お題に合わない' : '出題範囲外'}`};
-  return {g, card, valid:true, msg:`「${card.name}」`};
+  // 有効な答えが2つに絞れない（judgeName の other 1枚ではなく有効なカード全体で見る。CSV の並び順で結果が変わらないように）
+  const sc = cardScore(q, ans, 0, qc), low = sc.score - settings.margin;
+  if(themeValid(theme).some(c => c._norm !== ans._norm && (sc.near ? nearCard(qc, c) : cardScore(q, c, low, qc).score > low))) return {g:X, msg:'カードを1枚に決められない'};
+  return {g:r.g, card:ans, valid:true, msg:`「${ans.name}」` + (r.msg ? '・' + r.msg : '')};
+}
+// お題に合う出題範囲のカード（お題ごとに1回だけ作る。主催者の出題範囲が変わったら作り直す）
+function themeValid(theme){
+  const e = themeValidCache.get(theme);
+  if(e && e.range === host.range) return e.list;
+  const list = host.range.filter(theme.test);
+  themeValidCache.set(theme, {range:host.range, list});
+  return list;
 }
 
 /* --- 主催者 --- */
@@ -1457,7 +1481,7 @@ function closeQuestion(){
     }).sort((a, b) => b.pts - a.pts || a.ms - b.ms);
   }
   // お題の形式は、有効な答え（異なる名前を最大 THEME_EXAMPLES＝40件。お題の答えは hi 以下なので、ふつうは全件）を出す
-  if(THEME_GAMES.includes(game)) host.examples = [...new Set(host.range.filter(q.theme.test).map(c => c.name))].sort((a, b) => a.localeCompare(b, 'ja')).slice(0, THEME_EXAMPLES);
+  if(THEME_GAMES.includes(game)) host.examples = [...new Set(themeValid(q.theme).map(c => c.name))].sort((a, b) => a.localeCompare(b, 'ja')).slice(0, THEME_EXAMPLES);
   host.phase = 'reveal'; hostArmNext(NEXT_MS); hostSync();
 }
 // かぶっちゃやーよ：有効な回答のうち、ほかの人と同じカード（名前で比べる）を答えた人は全員0点
