@@ -325,10 +325,14 @@ let settings = loadJSON('dmpq-settings', {th2:0.6, th3:0.3, margin:0.1, article:
 // カード別の成績は、id が __proto__ などでも壊れないようにプロトタイプのないオブジェクトに入れる（保存形式は変わらない）
 const statCards = o => Object.assign(Object.create(null), o && typeof o === 'object' && !Array.isArray(o) ? o : {});
 let stats = loadJSON('dmpq-stats', {total:0, correct:0, cards:{}}); stats.cards = statCards(stats.cards);
-let quizCfg = loadJSON('dmpq-quiz', {formats:['ft','spec'], customFields:['civ','cost','power'], civs:[], sets:[], count:10, mode:'free'});
+let quizCfg = loadJSON('dmpq-quiz', {formats:['ft','spec'], customFields:['civ','cost','power'], civs:[], sets:[], count:10, mode:'free', play:'normal', time:60});
 // 以前の設定（収録弾を1つだけ選ぶ set）を、複数選べる sets に移す。空の配列は「すべて」
 if(Object.prototype.hasOwnProperty.call(quizCfg, 'set')){ if(typeof quizCfg.set === 'string' && quizCfg.set && !(Array.isArray(quizCfg.sets) && quizCfg.sets.length)) quizCfg.sets = [quizCfg.set]; delete quizCfg.set; }
 quizCfg.sets = Array.isArray(quizCfg.sets) ? quizCfg.sets.filter(v => typeof v === 'string' && v) : [];
+// 遊び方（通常／お題練習）と、お題練習の1つのお題の制限時間（秒）。保存値が想定外なら既定に戻す
+const PRACTICE_TIMES = [30, 60, 120];
+quizCfg.play = quizCfg.play === 'theme' ? 'theme' : 'normal';
+quizCfg.time = PRACTICE_TIMES.includes(quizCfg.time) ? quizCfg.time : 60;
 // 「すべて解除」の状態。空の配列（＝すべて）と区別するため、収録弾の名前にならない値だけを入れる（どのカードにも当たらないので範囲は0件）
 const SETS_NONE = '\u0000none';
 const setsNone = () => quizCfg.sets.length > 0 && quizCfg.sets.every(x => x === SETS_NONE);
@@ -561,15 +565,19 @@ const FORMATS = [
 const FMT_LABEL = Object.fromEntries(FORMATS.map(f => [f[0], f[1]]));
 function saveCfg(){ saveJSON('dmpq-quiz', quizCfg); }
 function setupHTML(){
-  const range = rangeCards();
+  const range = rangeCards(), theme = quizCfg.play === 'theme';
   const counts = Object.fromEntries(FORMATS.map(f => [f[0], eligible(f[0], range).length]));
-  const total = new Set(quizCfg.formats.flatMap(f => eligible(f, range).map(c => c.id))).size;
+  // お題練習は形式を使わず、出題範囲にカードがあれば始められる（大会のお題の形式と同じ）
+  const total = theme ? range.length : new Set(quizCfg.formats.flatMap(f => eligible(f, range).map(c => c.id))).size;
   const sets = setsNewestFirst(), known = new Set(sets);
   const picked = quizCfg.sets.filter(s => known.has(s)), gone = quizCfg.sets.filter(s => s !== SETS_NONE).length - picked.length;
   const allSets = !quizCfg.sets.length;
   const acc = stats.total ? Math.round(stats.correct / stats.total * 100) : null;
   return `
-  <section class="block"><h2>どの問題で遊ぶ？</h2><p class="lead">答えが1枚に決まる問題だけを出題します。${acc !== null ? `これまで${stats.total}問、正答率${acc}%。` : ''}</p>
+  <section class="block"><h3>遊び方</h3><div class="seg">${[['normal','通常'],['theme','お題練習']].map(([v, l]) => `<button class="${quizCfg.play === v ? 'on' : ''}" data-act="play" data-v="${v}">${l}</button>`).join('')}</div>
+    ${theme ? '<p class="note">かぶっちゃやーよ・ファイブボンバーの練習です。お題に合うカードを、制限時間内にできるだけ多く答えます（同じカードは1回だけ）。判定と点数は大会と同じです（スピードボーナスなし）。成績には記録しません。</p>' : ''}
+  </section>
+  ${theme ? '' : `<section class="block"><h2>どの問題で遊ぶ？</h2><p class="lead">答えが1枚に決まる問題だけを出題します。${acc !== null ? `これまで${stats.total}問、正答率${acc}%。` : ''}</p>
     <div class="opts">${FORMATS.map(([k, name, desc]) => `
       <button class="opt ${quizCfg.formats.includes(k) ? 'on' : ''}" data-act="fmt" data-v="${k}" aria-pressed="${quizCfg.formats.includes(k)}">
         <span><b>${name}</b><small>${desc}</small></span><span class="cnt">${counts[k]}問</span></button>`).join('')}
@@ -577,7 +585,7 @@ function setupHTML(){
     ${quizCfg.formats.includes('custom') ? `<div class="panel" style="margin-top:10px"><h3>カスタムで使う項目</h3>
       <div class="chips">${Object.entries(FIELD).map(([k, f]) => `<button class="chip ${quizCfg.customFields.includes(k) ? 'on' : ''}" data-act="cfield" data-v="${k}" aria-pressed="${quizCfg.customFields.includes(k)}">${f.label}</button>`).join('')}</div>
       <p class="note">この組み合わせで答えが1枚に決まるカードは${counts.custom}枚です。</p></div>` : ''}
-  </section>
+  </section>`}
   <section class="block"><h3>出題範囲</h3>
     ${searchRange ? `<div class="banner"><span>検索結果の${searchRange.size}枚から出題します</span><button class="btn ghost" data-act="clear-range">解除</button></div>` : ''}
     <div class="chips" style="margin-bottom:10px">${CIVS.map(v => `<button class="chip ${quizCfg.civs.includes(v) ? 'on' : ''}" data-act="qciv" data-v="${v}" aria-pressed="${quizCfg.civs.includes(v)}">${pips([v])}${v}</button>`).join('')}</div>
@@ -589,11 +597,14 @@ function setupHTML(){
     <p class="note">文明を選ばなければ全文明から出題します。収録弾は最初はすべて選ばれています（新しい弾から並べています。順は推定です）。</p>
   </section>
   <section class="block"><div class="grid2">
-    <div><h3>問題数</h3><div class="seg">${[[10,'10問'],[20,'20問'],[0,'エンドレス']].map(([v, l]) => `<button class="${quizCfg.count === v ? 'on' : ''}" data-act="count" data-v="${v}">${l}</button>`).join('')}</div></div>
-    <div><h3>回答方式</h3><div class="seg">${[['free','自由入力'],['choice','4択']].map(([v, l]) => `<button class="${quizCfg.mode === v ? 'on' : ''}" data-act="mode" data-v="${v}">${l}</button>`).join('')}</div></div>
+    <div><h3>${theme ? 'お題の数' : '問題数'}</h3><div class="seg">${[[10, theme ? '10個' : '10問'],[20, theme ? '20個' : '20問'],[0,'エンドレス']].map(([v, l]) => `<button class="${quizCfg.count === v ? 'on' : ''}" data-act="count" data-v="${v}">${l}</button>`).join('')}</div></div>
+    ${theme
+      ? `<div><h3>制限時間（1つのお題）</h3><div class="seg">${PRACTICE_TIMES.map(v => `<button class="${quizCfg.time === v ? 'on' : ''}" data-act="ptime" data-v="${v}">${v}秒</button>`).join('')}</div></div>`
+      : `<div><h3>回答方式</h3><div class="seg">${[['free','自由入力'],['choice','4択']].map(([v, l]) => `<button class="${quizCfg.mode === v ? 'on' : ''}" data-act="mode" data-v="${v}">${l}</button>`).join('')}</div></div>`}
   </div></section>
-  <button class="btn primary big" data-act="start" ${total ? '' : 'disabled'}>${total ? `${total}枚の中から出題する` : '出題できる問題がありません'}</button>
-  ${total ? '' : '<p class="note">形式を選ぶか、出題範囲を広げてください。</p>'}`;
+  ${theme && practiceError ? `<p class="ng">${esc(practiceError)}</p>` : ''}
+  <button class="btn primary big" data-act="start" ${total ? '' : 'disabled'}>${total ? `${total}枚の中から${theme ? 'お題を作る' : '出題する'}` : theme ? 'お題を作れるカードがありません' : '出題できる問題がありません'}</button>
+  ${total ? '' : `<p class="note">${theme ? '出題範囲を広げてください。' : '形式を選ぶか、出題範囲を広げてください。'}</p>`}`;
 }
 function weightedPick(list){
   const w = list.map(c => 1 + 2 * ((stats.cards[c.id] || {}).w || 0));
@@ -1101,43 +1112,135 @@ function makeTheme(list, lo, used = new Set(), hi = Math.max(30, lo + 10), kindC
 // （似ている別カードも有効で名前が違うときは「カードを1枚に決められない」。別カードが無効なら通常クイズと同じく△のまま（1文字違いでも△になる））
 // ✖︎で「もしかして」などの候補が有効なカードなら、名前を出さずに「カードを1枚に決められない」にする
 // ✖︎で候補の名前も出せないときは、全カードとの1文字違いで無効なカードに決まれば「出題範囲外／お題に合わない」と伝える
-// 有効なのは、出題範囲（host.rangeIds）にあってお題に合うカード。同じ名前のカードが複数あるときは有効なものを選ぶ
-function matchTheme(text, theme){
-  const ok = c => host.rangeIds.has(c.id) && theme.test(c);
+// 有効なのは、出題範囲（ctx.rangeIds）にあってお題に合うカード。同じ名前のカードが複数あるときは有効なものを選ぶ
+// ctx は出題範囲と名前の索引（range・rangeIds・nameIndex）。既定は主催者の host、お題練習では session.ctx を渡す
+function matchTheme(text, theme, ctx = host){
+  const ok = c => ctx.rangeIds.has(c.id) && theme.test(c);
   const qc = chars(norm(text)).slice(0, MAX_ANSWER), q = qc.join('');
   if(!q) return {g:X, msg:'回答なし'};
-  const found = host.nameIndex.get(q);
+  const found = ctx.nameIndex.get(q);
   if(found){
     if(new Set(found.map(c => c._norm)).size > 1) return {g:X, msg:'カードを1枚に決められない'};  // 読み・別名が名前の違う複数のカードに当たる
     const card = found.find(ok) || found[0];
-    if(!ok(card)) return {g:X, card, msg:`「${card.name}」は${host.rangeIds.has(card.id) ? 'お題に合わない' : '出題範囲外'}`};
+    if(!ok(card)) return {g:X, card, msg:`「${card.name}」は${ctx.rangeIds.has(card.id) ? 'お題に合わない' : '出題範囲外'}`};
     return {g:'◎', card, valid:true, msg:`「${card.name}」`};
   }
   let ans = null, best = 0;
-  for(const c of themeValid(theme)){ const s = cardScore(q, c, best, qc); if(s.score > best){ best = s.score; ans = c; } }
+  for(const c of themeValid(theme, ctx)){ const s = cardScore(q, c, best, qc); if(s.score > best){ best = s.score; ans = c; } }
   const r = ans ? judgeName(text, ans, false) : {g:X};
-  if(r.g === X && r.msg) return r.other && themeValid(theme).some(c => c._norm === r.other._norm) ? {g:X, msg:'カードを1枚に決められない'} : {g:X, msg:r.msg};  // 有効なカード名はヒントになるので出さない（範囲外の再録が other になっても名前で比べる）
+  if(r.g === X && r.msg) return r.other && themeValid(theme, ctx).some(c => c._norm === r.other._norm) ? {g:X, msg:'カードを1枚に決められない'} : {g:X, msg:r.msg};  // 有効なカード名はヒントになるので出さない（範囲外の再録が other になっても名前で比べる）
   if(r.g === X){
     // 有効なカードに当たらないときだけ、全カードと1文字違いを見て、無効なカード（出題範囲外・お題に合わない）に決まればそれを伝える
     const byName = new Map();
     for(const c of cards){ if(nearCard(qc, c)){ const a = byName.get(c._norm); a ? a.push(c) : byName.set(c._norm, [c]); if(byName.size > 1) break; } }
     if(byName.size > 1) return {g:X, msg:'カードを1枚に決められない'};
     const same = byName.size ? [...byName.values()][0] : [], card = same.find(ok) || same[0];
-    if(card && !ok(card)) return {g:X, card, msg:`「${card.name}」は${host.rangeIds.has(card.id) ? 'お題に合わない' : '出題範囲外'}`};
+    if(card && !ok(card)) return {g:X, card, msg:`「${card.name}」は${ctx.rangeIds.has(card.id) ? 'お題に合わない' : '出題範囲外'}`};
     return {g:X, msg:'カードが見つからない'};
   }
   // 有効な答えが2つに絞れない（judgeName の other 1枚ではなく有効なカード全体で見る。CSV の並び順で結果が変わらないように）
   const sc = cardScore(q, ans, 0, qc), low = sc.score - settings.margin;
-  if(themeValid(theme).some(c => c._norm !== ans._norm && (sc.near ? nearCard(qc, c) : cardScore(q, c, low, qc).score > low))) return {g:X, msg:'カードを1枚に決められない'};
+  if(themeValid(theme, ctx).some(c => c._norm !== ans._norm && (sc.near ? nearCard(qc, c) : cardScore(q, c, low, qc).score > low))) return {g:X, msg:'カードを1枚に決められない'};
   return {g:r.g, card:ans, valid:true, msg:`「${ans.name}」` + (r.msg ? '・' + r.msg : '')};
 }
-// お題に合う出題範囲のカード（お題ごとに1回だけ作る。主催者の出題範囲が変わったら作り直す）
-function themeValid(theme){
+// お題に合う出題範囲のカード（お題ごとに1回だけ作る。ctx の出題範囲（既定は主催者の host）が変わったら作り直す）
+function themeValid(theme, ctx = host){
   const e = themeValidCache.get(theme);
-  if(e && e.range === host.range) return e.list;
-  const list = host.range.filter(theme.test);
-  themeValidCache.set(theme, {range:host.range, list});
+  if(e && e.range === ctx.range) return e.list;
+  const list = ctx.range.filter(theme.test);
+  themeValidCache.set(theme, {range:ctx.range, list});
   return list;
+}
+
+/* --- お題練習（クイズタブの遊び方「お題練習」。かぶっちゃやーよ・ファイブボンバーのお題と判定を1人で試す。通信なし） --- */
+// 状態は session（kind:'theme'）に入れる。成績（stats）は更新しない。画面は quizView の tquestion・tresult・tsummary
+let practiceError = '';
+// お題の判定に使う出題範囲と名前の索引（matchTheme・themeValid の ctx。作り方は hostStart と同じ）
+function themeCtx(range){
+  const nameIndex = new Map();  // 正規化した名前・読み・別名 → カード（お題の回答の照合用）
+  for(const c of cards) for(const k of c._keys){ const a = nameIndex.get(k); a ? a.push(c) : nameIndex.set(k, [c]); }
+  return {range, rangeIds:new Set(range.map(c => c.id)), nameIndex};
+}
+function startPractice(){
+  practiceError = '';
+  const range = rangeCards();
+  if(!range.length){ session = null; practiceError = '出題範囲にカードがありません。出題範囲を見直してください。'; quizView = 'setup'; render(); return; }
+  themeAtoms(range);  // お題の索引は開始時に作っておく（最初のお題で画面が止まらないように）
+  // range は同じ配列を使い続ける（themeAtoms・themeValid のキャッシュが効くように）
+  session = {kind:'theme', ctx:themeCtx(range), total:quizCfg.count || Infinity, time:quizCfg.time, idx:0, usedThemes:new Set(), themeKinds:{}, themes:[], cur:null, out:false};
+  nextPracticeTheme();
+}
+function nextPracticeTheme(){
+  const s = session;
+  const theme = makeTheme(s.ctx.range, 10, s.usedThemes, 30, s.themeKinds);  // 答えの数の目標は大会を1人で開くときと同じ（lo＝10、hi＝30）
+  if(!theme){
+    if(!s.themes.length){ session = null; practiceError = '答えが十分にあるお題を作れませんでした。出題範囲を広げてください。'; quizView = 'setup'; render(); return; }
+    s.out = true; quizView = 'tsummary'; render(); return;
+  }
+  s.usedThemes.add(theme.key); s.usedThemes.add(theme.sig);
+  theme.kinds.forEach(k => s.themeKinds[k] = (s.themeKinds[k] || 0) + 1);
+  s.idx++;
+  s.cur = {theme, log:[], used:new Set(), score:0, endsAt:Date.now() + s.time * 1000, closed:false};
+  quizView = 'tquestion'; render();
+}
+// 1回の回答。判定は大会と同じ matchTheme で、このお題で答えたカードは「既出」で0点（ファイブボンバーと同じ）。点数は BASE_PTS（スピードボーナスなし）
+function practiceAnswer(text){
+  const s = session, t = s && s.kind === 'theme' && quizView === 'tquestion' ? s.cur : null;
+  if(!t || t.closed) return;
+  if(Date.now() >= t.endsAt){ closePracticeTheme(); render(); return; }  // 時間切れのあとの回答は数えない（タイマーの確認は200msごと）
+  text = String(text ?? '').slice(0, MAX_ANSWER);
+  if(!text.trim()) return;  // 空欄の回答は数えない
+  const res = matchTheme(text, t.theme, s.ctx);
+  if(res.valid && t.used.has(res.card._norm)){ res.valid = false; res.g = X; res.msg = `「${res.card.name}」は既出`; }
+  const pts = res.valid ? BASE_PTS[res.g] : 0;
+  if(res.valid) t.used.add(res.card._norm);
+  t.score += pts;
+  t.log.push({input:text, g:res.g, pts, msg:res.msg, valid:!!res.valid});
+  const i = $('#pr-answer'); if(i) i.value = '';  // render は入力中の内容を残すので、先に空にする
+  render();
+}
+// 今のお題を終える（時間切れ・「このお題を終える」・「終了する」・タブの切り替え）。描画は呼び出し側で行う
+function closePracticeTheme(){
+  const s = session, t = s && s.kind === 'theme' ? s.cur : null;
+  if(!t || t.closed) return;
+  t.closed = true; s.themes.push(t);
+  if(quizView === 'tquestion') quizView = 'tresult';
+}
+const practiceLogHTML = log => `<ul class="reslist">${log.map(r => { const G = own(GRADE, r.g) || GRADE[X]; return `<li><span class="rg ${G.cls}">${esc(r.g)}</span><span>${esc(r.input)}${r.msg ? `<small>${esc(r.msg)}</small>` : ''}</span><span class="rp">+${esc(r.pts)}</span></li>`; }).join('')}</ul>`;
+const practiceBarHTML = s => `<div class="qbar"><span><b>${s.total !== Infinity ? `お題 ${esc(s.idx)} / ${esc(s.total)}` : `お題 ${esc(s.idx)}個目`}</b>　お題練習</span><button class="btn ghost" data-act="pr-finish">終了する</button></div>`;
+function practiceQuestionHTML(){
+  const s = session, t = s.cur;
+  return `
+  ${practiceBarHTML(s)}
+  ${timerHTML('pr-timer')}
+  <div class="clue"><p class="ask">次のお題に当てはまる${askTarget('カード名')}をできるだけ多く答えてください（同じカードは1回だけ）</p><p class="qname">${themeTextHTML(t.theme.text)}</p></div>
+  <div class="answerbox"><label for="pr-answer" class="visually-hidden">回答</label><input id="pr-answer" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="カード名を入力"><button class="btn primary" data-act="pr-submit">回答</button></div>
+  <div class="subacts"><span>このお題 <b>${esc(t.score)}</b>点・有効 ${esc(t.used.size)}枚</span><button class="btn ghost" data-act="pr-end">このお題を終える</button></div>
+  ${t.log.length ? `<h3>回答の履歴</h3>${practiceLogHTML(t.log.slice().reverse())}` : ''}`;
+}
+function practiceResultHTML(){
+  const s = session, t = s.cur, last = s.idx >= s.total;
+  // 有効な答え（名前の重複を除き日本語順）。自分が答えたカードは太字と✓で示す（答えたカードは _norm で覚えている）
+  const valid = [...new Map(themeValid(t.theme, s.ctx).map(c => [c.name, c._norm])).entries()].sort((a, b) => a[0].localeCompare(b[0], 'ja'));
+  return `
+  ${practiceBarHTML(s)}
+  <div class="correct-big"><div class="k">お題</div><div class="v">${themeTextHTML(t.theme.text)}</div><small>このお題の得点 ${esc(t.score)}点（有効な回答 ${esc(t.used.size)}枚）</small></div>
+  <div class="row" style="margin-bottom:16px"><button class="btn primary" data-act="pr-next" id="nextbtn">${last ? '結果を見る' : '次のお題'}</button></div>
+  <h3>有効な答え（${esc(valid.length)}件）</h3>
+  <p class="note">${valid.map(([name, n]) => t.used.has(n) ? `<b>✓${esc(name)}</b>` : esc(name)).join('、')}</p>
+  <h3>あなたの回答</h3>${t.log.length ? practiceLogHTML(t.log) : '<p class="note">回答なし</p>'}`;
+}
+function practiceSummaryHTML(){
+  const s = session, th = s.themes, log = th.flatMap(t => t.log);
+  const cnt = g => log.filter(l => l.g === g).length, sum = th.reduce((a, t) => a + t.score, 0);
+  return `
+  <h2>おつかれさまでした</h2>
+  ${s.out ? '<p class="ng">これ以上お題を作れなかったため、練習を終えました。</p>' : ''}
+  <p class="score">${esc(sum)}<small>点</small></p>
+  <p class="lead" style="margin-bottom:0">お題${esc(th.length)}個・有効な回答${esc(log.filter(l => l.valid).length)}件（回答${esc(log.length)}件）</p>
+  <div class="tally">${['◎','○','△',X].map(g => `<div><span class="s ${GRADE[g].cls}">${g}</span><span class="n">${cnt(g)}</span></div>`).join('')}</div>
+  ${th.length ? `<h3>お題ごとの得点</h3><ul class="reslist" style="margin-bottom:20px">${th.map((t, i) => `<li><span class="rg">${esc(i + 1)}</span><span>${themeTextHTML(t.theme.text)}<small>有効な回答 ${esc(t.used.size)}枚</small></span><span class="rp">${esc(t.score)}点</span></li>`).join('')}</ul>` : ''}
+  <div class="row"><button class="btn primary" data-act="pr-again">同じ設定でもう一度</button><button class="btn" data-act="to-setup">設定に戻る</button></div>`;
 }
 
 /* --- 主催者 --- */
@@ -1908,6 +2011,12 @@ setInterval(() => {
     if(rem <= 0) hostTimeUp();
   }
   if(player && player.state && player.state.phase === 'question') updTimer('#p-timer', player.deadline - Date.now(), player.state.time * 1000);
+  // お題練習：残り時間の表示だけ書き換え（入力欄は描き直さない）、締切を過ぎたらお題を終える
+  if(tab === 'quiz' && quizView === 'tquestion' && session && session.kind === 'theme' && session.cur && !session.cur.closed){
+    const rem = session.cur.endsAt - Date.now();
+    updTimer('#pr-timer', rem, session.time * 1000);
+    if(rem <= 0){ closePracticeTheme(); render(); }
+  }
   tickNext();
 }, 200);
 // 正解発表のカウントダウン表示を今の残りに合わせる（主催者は host.nextAt、参加者は受け取った remainNext から）
@@ -1922,12 +2031,19 @@ window.addEventListener('beforeunload', e => { if(host && host.players.size){ e.
 function render(){
   document.querySelectorAll('nav.tabs button').forEach(b => { const on = b.dataset.tab === tab; b.classList.toggle('on', on); b.setAttribute('aria-current', on ? 'page' : 'false'); });
   const m = $('#main');
-  if(tab === 'quiz') m.innerHTML = quizView === 'setup' ? setupHTML() : quizView === 'question' ? questionHTML() : quizView === 'result' ? resultHTML() : summaryHTML();
+  // お題練習の回答中は、描き直しても入力中の内容を残す（回答した直後は practiceAnswer が先に空にしている）
+  const prIn = tab === 'quiz' && quizView === 'tquestion' ? $('#pr-answer') : null, prVal = prIn ? prIn.value : null;
+  if(tab === 'quiz') m.innerHTML = quizView === 'setup' ? setupHTML() : quizView === 'question' ? questionHTML() : quizView === 'result' ? resultHTML()
+    : quizView === 'tquestion' ? practiceQuestionHTML() : quizView === 'tresult' ? practiceResultHTML() : quizView === 'tsummary' ? practiceSummaryHTML() : summaryHTML();
   else if(tab === 'search'){ m.innerHTML = searchHTML(); updateResults(); }
   else if(tab === 'party'){ m.innerHTML = partyHTML(); afterPartyRender(); }
   else m.innerHTML = dataHTML();
   if(tab === 'quiz' && quizView === 'question'){ const i = $('#answer'); if(i) i.focus({preventScroll:true}); }
-  if(tab === 'quiz' && quizView === 'result'){ const b = $('#nextbtn'); if(b) b.focus({preventScroll:true}); }
+  if(tab === 'quiz' && quizView === 'result'){ const b = $('#nextbtn'); if(b) b.focus({preventScroll:true}); }  // お題練習の結果（tresult）は時間切れで切り替わるので、打ち続けた Enter で次へ進まないようにフォーカスしない
+  if(tab === 'quiz' && quizView === 'tquestion'){
+    const i = $('#pr-answer'); if(i){ if(prVal != null) i.value = prVal; i.focus({preventScroll:true}); }
+    updTimer('#pr-timer', session.cur.endsAt - Date.now(), session.time * 1000);
+  }
   tickNext();
 }
 function toggle(arr, v){ const i = arr.indexOf(v); i >= 0 ? arr.splice(i, 1) : arr.push(v); }
@@ -1941,7 +2057,10 @@ function keepScroll(sel, fn){
 
 document.addEventListener('click', e => {
   const tb = e.target.closest('nav.tabs button');
-  if(tb){ tab = tb.dataset.tab; render(); window.scrollTo(0, 0); return; }
+  if(tb){
+    if(tab === 'quiz' && tb.dataset.tab !== 'quiz' && quizView === 'tquestion') closePracticeTheme();  // お題練習の途中でほかのタブに移ったら、そのお題を終える（戻るとお題の結果）
+    tab = tb.dataset.tab; render(); window.scrollTo(0, 0); return;
+  }
   if(e.target.id === 'sheet'){ closeDetail(); return; }
   const t = e.target.closest('[data-act]'); if(!t) return;
   const v = t.dataset.v, act = t.dataset.act;
@@ -1951,8 +2070,15 @@ document.addEventListener('click', e => {
     case 'qciv': toggle(quizCfg.civs, v); saveCfg(); render(); break;
     case 'count': quizCfg.count = Number(v); saveCfg(); render(); break;
     case 'mode': quizCfg.mode = v; saveCfg(); render(); break;
+    case 'play': if(v === 'normal' || v === 'theme'){ quizCfg.play = v; practiceError = ''; saveCfg(); render(); } break;
+    case 'ptime': { const n = Number(v); if(PRACTICE_TIMES.includes(n)){ quizCfg.time = n; saveCfg(); render(); } } break;
     case 'clear-range': searchRange = null; render(); break;
-    case 'start': startQuiz(); window.scrollTo(0, 0); break;
+    case 'start': quizCfg.play === 'theme' ? startPractice() : startQuiz(); window.scrollTo(0, 0); break;
+    case 'pr-submit': practiceAnswer($('#pr-answer') ? $('#pr-answer').value : ''); break;
+    case 'pr-end': if(quizView === 'tquestion'){ closePracticeTheme(); render(); window.scrollTo(0, 0); } break;
+    case 'pr-next': if(session && session.kind === 'theme'){ if(session.idx >= session.total){ quizView = 'tsummary'; render(); } else nextPracticeTheme(); window.scrollTo(0, 0); } break;
+    case 'pr-finish': if(session && session.kind === 'theme'){ closePracticeTheme(); quizView = 'tsummary'; render(); window.scrollTo(0, 0); } break;
+    case 'pr-again': startPractice(); window.scrollTo(0, 0); break;
     case 'submit': submitAnswer($('#answer').value); window.scrollTo(0, 0); break;
     case 'choose': submitAnswer(session.q.choices[Number(t.dataset.i)]); window.scrollTo(0, 0); break;
     case 'skip': submitAnswer(''); window.scrollTo(0, 0); break;
@@ -2029,6 +2155,7 @@ document.addEventListener('keydown', e => {
   if(e.key !== 'Enter') return;
   if(e.target.id === 'answer'){ e.preventDefault(); submitAnswer(e.target.value); window.scrollTo(0, 0); return; }
   if(e.target.id === 'p-answer'){ e.preventDefault(); playerSubmit(e.target.value); return; }
+  if(e.target.id === 'pr-answer'){ e.preventDefault(); practiceAnswer(e.target.value); return; }
   if(e.target.id === 'j-code' || e.target.id === 'j-name'){ e.preventDefault(); joinRoom($('#j-code').value, $('#j-name').value); return; }
 });
 
